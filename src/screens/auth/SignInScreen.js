@@ -52,7 +52,7 @@ export default function SignInScreen() {
       if (existing) { setError('That username is already taken'); setLoading(false); return }
       const { error } = await signUp(email, password, username.trim(), displayName)
       if (error) setError(JSON.stringify(error))
-      else router.replace('/(tabs)/home')
+      else router.replace('/spotify-onboarding')
     }
     setLoading(false)
   }
