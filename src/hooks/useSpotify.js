@@ -1,6 +1,7 @@
 import { exchangeCodeAsync, makeRedirectUri, refreshAsync, useAuthRequest } from 'expo-auth-session'
 import * as WebBrowser from 'expo-web-browser'
 import { useEffect, useState } from 'react'
+import { Platform } from 'react-native'
 import { supabase } from '../lib/supabase'
 import { useAuth } from './useAuth'
 
@@ -18,13 +19,15 @@ const discovery = {
   tokenEndpoint: 'https://accounts.spotify.com/api/token',
 }
 
+const redirectUri = Platform.OS === 'web'
+  ? process.env.EXPO_PUBLIC_SPOTIFY_REDIRECT_URI
+  : makeRedirectUri({ scheme: 'NightLife', path: 'spotify-callback' })
+
 export function useSpotify() {
   const { user } = useAuth()
   const [connected, setConnected] = useState(false)
   const [accessToken, setAccessToken] = useState(null)
   const [loading, setLoading] = useState(true)
-
-  const redirectUri = makeRedirectUri({ scheme: 'NightLife', path: 'spotify-callback' })
 
   const [request, response, promptAsync] = useAuthRequest(
     {
