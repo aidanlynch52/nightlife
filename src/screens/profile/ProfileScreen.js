@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { Dimensions, Image, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useAuth } from '../../hooks/useAuth'
+import { useSpotify } from '../../hooks/useSpotify'
 import { supabase } from '../../lib/supabase'
 import CreatePostScreen from '../posts/CreatePostScreen'
 
@@ -537,6 +538,56 @@ function PostsTab({ userId }) {
     </View>
   )
 }
+function StatsTab() {
+  const { connected, connectSpotify, disconnect } = useSpotify()
+  const [showSpotifyModal, setShowSpotifyModal] = useState(false)
+
+  return (
+    <View style={{ flex: 1 }}>
+      <View style={{ flexDirection: 'row', justifyContent: 'flex-end', padding: 16 }}>
+        {connected ? (
+          <TouchableOpacity
+            style={{ backgroundColor: '#1DB954', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8 }}
+            onPress={() => setShowSpotifyModal(true)}>
+            <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>● Spotify Connected</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={{ borderWidth: 1, borderColor: '#1DB954', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8 }}
+            onPress={connectSpotify}>
+            <Text style={{ color: '#1DB954', fontSize: 12, fontWeight: '600' }}>Connect Spotify</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      <View style={styles.emptyState}>
+        <Text style={styles.emptyText}>No stats yet</Text>
+        <Text style={styles.emptySubtext}>Attend nights to build your stats</Text>
+      </View>
+
+      <Modal visible={showSpotifyModal} animationType="fade" transparent>
+        <TouchableOpacity style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.4)' }} activeOpacity={1} onPress={() => setShowSpotifyModal(false)} />
+        <View style={{ position: 'absolute', top: '50%', left: 20, right: 20, transform: [{ translateY: -80 }], backgroundColor: '#fff', borderRadius: 16, padding: 24, borderWidth: 1, borderColor: '#ddd' }}>
+          <Text style={{ fontSize: 16, fontWeight: '600', color: '#111', marginBottom: 8 }}>Spotify Connected</Text>
+          <Text style={{ fontSize: 13, color: '#888', marginBottom: 20 }}>Would you like to switch to a different Spotify account?</Text>
+          <TouchableOpacity
+            style={{ backgroundColor: '#1DB954', borderRadius: 10, padding: 12, alignItems: 'center', marginBottom: 10 }}
+            onPress={() => { setShowSpotifyModal(false); connectSpotify() }}>
+            <Text style={{ color: '#fff', fontWeight: '600' }}>Switch Account</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={{ borderWidth: 1, borderColor: '#e0e0e0', borderRadius: 10, padding: 12, alignItems: 'center', marginBottom: 10 }}
+            onPress={() => { setShowSpotifyModal(false); disconnect() }}>
+            <Text style={{ color: '#cc0000', fontWeight: '500' }}>Disconnect Spotify</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setShowSpotifyModal(false)} style={{ alignItems: 'center' }}>
+            <Text style={{ color: '#888', fontSize: 13 }}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
+    </View>
+  )
+}
 export default function ProfileScreen() {
   const [activeTab, setActiveTab] = useState('posts')
   const [avatarUri, setAvatarUri] = useState(null)
@@ -715,7 +766,7 @@ export default function ProfileScreen() {
           {activeTab === 'posts' && <PostsTab userId={user?.id} />}
           {activeTab === 'nights' && <NightsTab userId={user?.id} />}
           {activeTab === 'hof' && <HallOfFameTab userId={user?.id} />}
-          {activeTab === 'stats' && <View style={styles.emptyState}><Text style={styles.emptyText}>No stats yet</Text><Text style={styles.emptySubtext}>Attend nights to build your stats</Text></View>}
+          {activeTab === 'stats' && <StatsTab />}
         </ScrollView>
       </SafeAreaView>
 
