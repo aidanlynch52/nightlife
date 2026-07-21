@@ -64,7 +64,7 @@ export default function QRTabScreen() {
           </style>
         </head>
         <body>
-          <img src="https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${activeNight?.qrToken}" />
+        <img src="https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(`https://nightlifesocialmedia.com/join/${activeNight?.qrToken}`)}" />  
         </body>
       </html>
     `)
@@ -74,7 +74,7 @@ export default function QRTabScreen() {
   }
 
   function handleCopyLink() {
-    const link = `https://nightlife.app/join/${activeNight?.qrToken}`
+    const link = `https://nightlifesocialmedia.com/join/${activeNight?.qrToken}`
     Clipboard.setString(link)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
@@ -187,7 +187,7 @@ export default function QRTabScreen() {
         <View style={styles.qrSection}>
           <View style={styles.qrBox}>
             <QRCode
-              value={activeNight?.qrToken || 'nightlife'}
+              value={`https://nightlifesocialmedia.com/join/${activeNight?.qrToken}`}
               size={QR_SIZE}
               color="#000"
               backgroundColor="#fff"
@@ -372,10 +372,10 @@ const styles = StyleSheet.create({
   header: { alignItems: 'center', marginBottom: 32, position: 'relative' },
   title: { fontSize: 28, fontWeight: '700', color: '#111', textAlign: 'center' },
   headerRight: { position: 'absolute', right: 0, top: 0, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  peopleBtn: { borderWidth: 1.5, borderColor: '#888', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, backgroundColor: '#fff', minHeight: 36, justifyContent: 'center' },
-  peopleBtnText: { fontSize: 16 },
-  endBtn: { borderWidth: 1.5, borderColor: '#cc0000', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 7, backgroundColor: '#fff', minHeight: 36, justifyContent: 'center' },
-  endBtnText: { color: '#cc0000', fontSize: 13, fontWeight: '500' },
+  peopleBtn: { borderWidth: 1.5, borderColor: '#888', borderRadius: 8, paddingHorizontal: SCREEN_WIDTH > 600 ? 10 : 7, paddingVertical: SCREEN_WIDTH > 600 ? 7 : 4, backgroundColor: '#fff', justifyContent: 'center' },
+  peopleBtnText: { fontSize: SCREEN_WIDTH > 600 ? 16 : 13 },
+endBtn: { borderWidth: 1.5, borderColor: '#cc0000', borderRadius: 8, paddingHorizontal: SCREEN_WIDTH > 600 ? 14 : 8, paddingVertical: SCREEN_WIDTH > 600 ? 7 : 4, backgroundColor: '#fff', justifyContent: 'center' },
+endBtnText: { color: '#cc0000', fontSize: SCREEN_WIDTH > 600 ? 13 : 11, fontWeight: '500' },
   qrSection: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 20 },
   qrBox: { backgroundColor: '#fff', padding: 20, borderRadius: 16, borderWidth: 1, borderColor: '#ddd' },
   hint: { fontSize: 13, color: '#888', textAlign: 'center' },
