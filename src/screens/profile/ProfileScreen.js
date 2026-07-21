@@ -606,6 +606,7 @@ export default function ProfileScreen() {
   const [medalPicker, setMedalPicker] = useState(null)
   const [stats, setStats] = useState({ nights: 0, friends: 0, met: 0 })
   const { user } = useAuth()
+  const { mode, toggleTheme } = useTheme()
 
   useEffect(() => {
     if (!user) return
@@ -807,6 +808,15 @@ export default function ProfileScreen() {
             <Text style={styles.editLabel}>Username</Text>
             <TextInput style={styles.editInput} value={editUsername} onChangeText={setEditUsername} placeholder="Username" placeholderTextColor="#666" autoCapitalize="none" />
             <View style={styles.editModalBtns}>
+              <View style={styles.themeRow}>
+  <Text style={styles.editLabel}>Dark mode</Text>
+  <Switch
+    value={mode === 'dark'}
+    onValueChange={toggleTheme}
+    trackColor={{ false: '#ccc', true: '#1DB954' }}
+    thumbColor="#fff"
+  />
+</View>
               <TouchableOpacity style={styles.editCancelBtn} onPress={() => setShowEditModal(false)}><Text style={styles.editCancelText}>Cancel</Text></TouchableOpacity>
               <TouchableOpacity style={styles.editSaveBtn} onPress={saveProfileEdits}><Text style={styles.editSaveText}>Save</Text></TouchableOpacity>
             </View>
@@ -896,6 +906,7 @@ const styles = StyleSheet.create({
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   editPencil: { fontSize: 14, color: '#555' },
   statItem: { alignItems: 'center' },
+  themeRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 16 },
   avatar: { width: isMobile ? 52 : 70, height: isMobile ? 52 : 70, borderRadius: isMobile ? 26 : 35, backgroundColor: '#e8e8e8', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#ddd' },
 name: { fontSize: isMobile ? 15 : 20, fontWeight: '600', color: '#111' },
 username: { fontSize: isMobile ? 12 : 15, color: '#555', marginTop: 2 },

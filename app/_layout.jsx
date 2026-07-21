@@ -1,5 +1,6 @@
 import { Stack, router } from 'expo-router'
 import { useEffect } from 'react'
+import { ThemeProvider } from '../src/contexts/ThemeContext'
 import NightProvider from '../src/lib/NightContext.js'
 import { supabase } from '../src/lib/supabase'
 
@@ -14,8 +15,10 @@ export default function RootLayout() {
   }, [])
 
   return (
-    <NightProvider>
-      <Stack screenOptions={{ headerShown: false }} />
-    </NightProvider>
+    <ThemeProvider>
+      <NightProvider>
+        <Stack screenOptions={{ headerShown: false }} />
+      </NightProvider>
+    </ThemeProvider>
   )
 }
