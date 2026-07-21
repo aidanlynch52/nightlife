@@ -1,8 +1,9 @@
 import * as ImagePicker from 'expo-image-picker'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useEffect, useState } from 'react'
-import { Dimensions, Image, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import { Alert, Dimensions, Image, Modal, Platform, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../hooks/useAuth'
 import { useSpotify } from '../../hooks/useSpotify'
 import { supabase } from '../../lib/supabase'
@@ -22,6 +23,9 @@ function getAvatarUrl(userId) {
 }
 
 function NightCatalogModal({ night, onClose }) {
+  const { colors } = useTheme()
+  const styles = createStyles(colors)
+  const nightStyles = createNightStyles(colors)
   const [photos, setPhotos] = useState([])
   const COLUMNS = SCREEN_WIDTH > 700 ? 6 : 3
   const GAP = 2
@@ -37,7 +41,7 @@ function NightCatalogModal({ night, onClose }) {
   }, [night?.id])
 
   return (
-    <LinearGradient colors={['#f0f0f0', '#ffffff']} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} style={{ flex: 1, minHeight: '100%' }}>
+    <LinearGradient colors={colors.backgroundGradient} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} style={{ flex: 1, minHeight: '100%' }}>
       <SafeAreaView style={{ flex: 1 }}>
         <View style={nightStyles.modalHeader}>
           <TouchableOpacity onPress={onClose}><Text style={nightStyles.modalBack}>← Back</Text></TouchableOpacity>
@@ -57,6 +61,8 @@ function NightCatalogModal({ night, onClose }) {
 }
 
 function NightPickerModal({ visible, onClose, onSelect, userId, excludeIds }) {
+  const { colors } = useTheme()
+  const nightStyles = createNightStyles(colors)
   const [nights, setNights] = useState([])
 
   useEffect(() => {
@@ -83,7 +89,7 @@ function NightPickerModal({ visible, onClose, onSelect, userId, excludeIds }) {
                 <Text style={nightStyles.pickerDate}>{new Date(n.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</Text>
               </TouchableOpacity>
             ))}
-            {!nights.length && <Text style={{ color: '#555', padding: 16 }}>No eligible nights yet</Text>}
+            {!nights.length && <Text style={{ color: colors.textSecondary, padding: 16 }}>No eligible nights yet</Text>}
           </ScrollView>
           <TouchableOpacity style={[nightStyles.editCancel, { marginTop: 12 }]} onPress={onClose}>
             <Text style={nightStyles.editCancelText}>Cancel</Text>
@@ -101,6 +107,8 @@ const SORT_OPTIONS = [
 ]
 
 function FilterModal({ visible, onClose, onApply, userId, allNights, onSearchChange, searchText }) {
+  const { colors } = useTheme()
+  const filterStyles = createFilterStyles(colors)
   const [minPeople, setMinPeople] = useState('')
   const [maxPeople, setMaxPeople] = useState('')
   const [friends, setFriends] = useState([])
@@ -148,7 +156,7 @@ function FilterModal({ visible, onClose, onApply, userId, allNights, onSearchCha
         <TextInput
           style={filterStyles.searchInput}
           placeholder="Search by night name"
-          placeholderTextColor="#666"
+          placeholderTextColor={colors.textMuted}
           value={searchText}
           onChangeText={onSearchChange}
         />
@@ -162,7 +170,7 @@ function FilterModal({ visible, onClose, onApply, userId, allNights, onSearchCha
               value={minPeople}
               onChangeText={setMinPeople}
               placeholder="0"
-              placeholderTextColor="#666"
+              placeholderTextColor={colors.textMuted}
               keyboardType="numeric"
             />
           </View>
@@ -174,7 +182,7 @@ function FilterModal({ visible, onClose, onApply, userId, allNights, onSearchCha
               value={maxPeople}
               onChangeText={setMaxPeople}
               placeholder="Any"
-              placeholderTextColor="#666"
+              placeholderTextColor={colors.textMuted}
               keyboardType="numeric"
             />
           </View>
@@ -192,16 +200,16 @@ function FilterModal({ visible, onClose, onApply, userId, allNights, onSearchCha
                 />
                 {selectedFriends.includes(f.id) && (
                   <View style={filterStyles.friendCheck}>
-                    <Text style={{ color: '#fff', fontSize: 9, fontWeight: '700' }}>✓</Text>
+                    <Text style={{ color: colors.buttonPrimaryText, fontSize: 9, fontWeight: '700' }}>✓</Text>
                   </View>
                 )}
               </View>
-              <Text style={[filterStyles.friendChipName, selectedFriends.includes(f.id) && { color: '#000', fontWeight: '600' }]} numberOfLines={1}>
+              <Text style={[filterStyles.friendChipName, selectedFriends.includes(f.id) && { color: colors.text, fontWeight: '600' }]} numberOfLines={1}>
                 {f.display_name?.split(' ')[0]}
               </Text>
             </TouchableOpacity>
           ))}
-          {!friends.length && <Text style={{ color: '#555', fontSize: 12, padding: 8 }}>No friends yet</Text>}
+          {!friends.length && <Text style={{ color: colors.textSecondary, fontSize: 12, padding: 8 }}>No friends yet</Text>}
         </ScrollView>
 
         <View style={filterStyles.footer}>
@@ -218,6 +226,9 @@ function FilterModal({ visible, onClose, onApply, userId, allNights, onSearchCha
 }
 
 function NightsTab({ userId }) {
+  const { colors } = useTheme()
+  const styles = createStyles(colors)
+  const nightStyles = createNightStyles(colors)
   const [nights, setNights] = useState([])
   const [filteredNights, setFilteredNights] = useState([])
   const [loading, setLoading] = useState(true)
@@ -313,9 +324,9 @@ function NightsTab({ userId }) {
       <View style={nightStyles.filterRow}>
         <View style={nightStyles.sortWrap}>
           <TouchableOpacity style={nightStyles.sortBtn} onPress={() => setShowSortDropdown(!showSortDropdown)}>
-  <Text style={nightStyles.sortBtnText}>{currentSort?.icon}</Text>
-  <Text style={{ fontSize: 8, color: '#555', marginTop: 1 }}>▼</Text>
-</TouchableOpacity>
+            <Text style={nightStyles.sortBtnText}>{currentSort?.icon}</Text>
+            <Text style={{ fontSize: 8, color: colors.textSecondary, marginTop: 1 }}>▼</Text>
+          </TouchableOpacity>
           {showSortDropdown && (
             <View style={nightStyles.sortDropdown}>
               {SORT_OPTIONS.map(opt => (
@@ -340,7 +351,7 @@ function NightsTab({ userId }) {
           {night.coverPhoto ? (
             <Image source={{ uri: getPhotoUrl(night.coverPhoto.storage_path) }} style={nightStyles.cardImage} />
           ) : (
-            <View style={[nightStyles.cardImage, { backgroundColor: '#f0f0f0', alignItems: 'center', justifyContent: 'center' }]}>
+            <View style={[nightStyles.cardImage, { backgroundColor: colors.inputBackground, alignItems: 'center', justifyContent: 'center' }]}>
               <Text style={{ fontSize: 24 }}>🌙</Text>
             </View>
           )}
@@ -378,7 +389,7 @@ function NightsTab({ userId }) {
         <View style={nightStyles.editOverlay}>
           <View style={nightStyles.editSheet}>
             <Text style={nightStyles.editTitle}>Rename night</Text>
-            <TextInput style={nightStyles.editInput} value={editName} onChangeText={setEditName} placeholder="Night name" placeholderTextColor="#555" autoFocus />
+            <TextInput style={nightStyles.editInput} value={editName} onChangeText={setEditName} placeholder="Night name" placeholderTextColor={colors.textSecondary} autoFocus />
             <View style={nightStyles.editBtns}>
               <TouchableOpacity style={nightStyles.editCancel} onPress={() => setEditingNight(null)}><Text style={nightStyles.editCancelText}>Cancel</Text></TouchableOpacity>
               <TouchableOpacity style={nightStyles.editSave} onPress={saveNightName}><Text style={nightStyles.editSaveText}>Save</Text></TouchableOpacity>
@@ -391,6 +402,9 @@ function NightsTab({ userId }) {
 }
 
 function HallOfFameTab({ userId }) {
+  const { colors } = useTheme()
+  const styles = createStyles(colors)
+  const nightStyles = createNightStyles(colors)
   const [hofNights, setHofNights] = useState([])
   const [showPicker, setShowPicker] = useState(false)
   const [selectedNight, setSelectedNight] = useState(null)
@@ -439,7 +453,7 @@ function HallOfFameTab({ userId }) {
               <Image key={photo.id} source={{ uri: getPhotoUrl(photo.storage_path) }} style={{ width: photoSize, height: photoSize, margin: 1, borderRadius: 4 }} />
             ))}
             {item.photos.length === 0 && (
-              <View style={{ width: SCREEN_WIDTH - 32, height: 100, backgroundColor: '#f5f5f5', alignItems: 'center', justifyContent: 'center' }}>
+              <View style={{ width: SCREEN_WIDTH - 32, height: 100, backgroundColor: colors.inputBackground, alignItems: 'center', justifyContent: 'center' }}>
                 <Text style={{ fontSize: 32 }}>⭐</Text>
               </View>
             )}
@@ -467,7 +481,10 @@ function HallOfFameTab({ userId }) {
     </View>
   )
 }
+
 function PostsTab({ userId }) {
+  const { colors } = useTheme()
+  const styles = createStyles(colors)
   const [showCreatePost, setShowCreatePost] = useState(false)
   const [posts, setPosts] = useState([])
   const [loading, setLoading] = useState(true)
@@ -497,9 +514,9 @@ function PostsTab({ userId }) {
   return (
     <View>
       <TouchableOpacity
-        style={{ borderWidth: 1, borderColor: '#ddd', borderRadius: 10, padding: 14, alignItems: 'center', margin: 16, backgroundColor: '#fff' }}
+        style={{ borderWidth: 1, borderColor: colors.borderStrong, borderRadius: 10, padding: 14, alignItems: 'center', margin: 16, backgroundColor: colors.cardBackground }}
         onPress={() => setShowCreatePost(true)}>
-        <Text style={{ color: '#555', fontSize: 14 }}>+ Create a post</Text>
+        <Text style={{ color: colors.textSecondary, fontSize: 14 }}>+ Create a post</Text>
       </TouchableOpacity>
 
       {!posts.length && (
@@ -521,7 +538,7 @@ function PostsTab({ userId }) {
                   resizeMode="cover"
                 />
               ) : (
-                <View style={{ width: '100%', height: '100%', backgroundColor: '#f0f0f0', alignItems: 'center', justifyContent: 'center' }}>
+                <View style={{ width: '100%', height: '100%', backgroundColor: colors.inputBackground, alignItems: 'center', justifyContent: 'center' }}>
                   <Text style={{ fontSize: 24 }}>📷</Text>
                 </View>
               )}
@@ -539,7 +556,10 @@ function PostsTab({ userId }) {
     </View>
   )
 }
+
 function StatsTab() {
+  const { colors } = useTheme()
+  const styles = createStyles(colors)
   const { connected, connectSpotify, disconnect, spotifyProfile } = useSpotify()
   const [showSpotifyModal, setShowSpotifyModal] = useState(false)
 
@@ -548,15 +568,15 @@ function StatsTab() {
       <View style={{ flexDirection: 'row', justifyContent: 'flex-end', padding: 16 }}>
         {connected ? (
           <TouchableOpacity
-  style={{ backgroundColor: '#1DB954', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 8 }}
-  onPress={() => setShowSpotifyModal(true)}>
-  {spotifyProfile?.images?.[0]?.url ? (
-    <Image source={{ uri: spotifyProfile.images[0].url }} style={{ width: 20, height: 20, borderRadius: 10 }} />
-  ) : (
-    <Text style={{ color: '#fff', fontSize: 10 }}>●</Text>
-  )}
-  <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>Spotify Connected</Text>
-</TouchableOpacity>
+            style={{ backgroundColor: '#1DB954', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 8 }}
+            onPress={() => setShowSpotifyModal(true)}>
+            {spotifyProfile?.images?.[0]?.url ? (
+              <Image source={{ uri: spotifyProfile.images[0].url }} style={{ width: 20, height: 20, borderRadius: 10 }} />
+            ) : (
+              <Text style={{ color: '#fff', fontSize: 10 }}>●</Text>
+            )}
+            <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>Spotify Connected</Text>
+          </TouchableOpacity>
         ) : (
           <TouchableOpacity
             style={{ borderWidth: 1, borderColor: '#1DB954', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8 }}
@@ -573,28 +593,31 @@ function StatsTab() {
 
       <Modal visible={showSpotifyModal} animationType="fade" transparent>
         <TouchableOpacity style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.4)' }} activeOpacity={1} onPress={() => setShowSpotifyModal(false)} />
-        <View style={{ position: 'absolute', top: '50%', left: 20, right: 20, transform: [{ translateY: -80 }], backgroundColor: '#fff', borderRadius: 16, padding: 24, borderWidth: 1, borderColor: '#ddd' }}>
-          <Text style={{ fontSize: 16, fontWeight: '600', color: '#111', marginBottom: 8 }}>Spotify Connected</Text>
-          <Text style={{ fontSize: 13, color: '#888', marginBottom: 20 }}>Would you like to switch to a different Spotify account?</Text>
+        <View style={{ position: 'absolute', top: '50%', left: 20, right: 20, transform: [{ translateY: -80 }], backgroundColor: colors.cardBackground, borderRadius: 16, padding: 24, borderWidth: 1, borderColor: colors.borderStrong }}>
+          <Text style={{ fontSize: 16, fontWeight: '600', color: colors.text, marginBottom: 8 }}>Spotify Connected</Text>
+          <Text style={{ fontSize: 13, color: colors.textMuted, marginBottom: 20 }}>Would you like to switch to a different Spotify account?</Text>
           <TouchableOpacity
             style={{ backgroundColor: '#1DB954', borderRadius: 10, padding: 12, alignItems: 'center', marginBottom: 10 }}
             onPress={() => { setShowSpotifyModal(false); connectSpotify() }}>
             <Text style={{ color: '#fff', fontWeight: '600' }}>Switch Account</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={{ borderWidth: 1, borderColor: '#e0e0e0', borderRadius: 10, padding: 12, alignItems: 'center', marginBottom: 10 }}
+            style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 10, padding: 12, alignItems: 'center', marginBottom: 10 }}
             onPress={() => { setShowSpotifyModal(false); disconnect() }}>
-            <Text style={{ color: '#cc0000', fontWeight: '500' }}>Disconnect Spotify</Text>
+            <Text style={{ color: colors.danger, fontWeight: '500' }}>Disconnect Spotify</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={() => setShowSpotifyModal(false)} style={{ alignItems: 'center' }}>
-            <Text style={{ color: '#888', fontSize: 13 }}>Cancel</Text>
+            <Text style={{ color: colors.textMuted, fontSize: 13 }}>Cancel</Text>
           </TouchableOpacity>
         </View>
       </Modal>
     </View>
   )
 }
+
 export default function ProfileScreen() {
+  const { colors, mode, toggleTheme } = useTheme()
+  const styles = createStyles(colors)
   const [activeTab, setActiveTab] = useState('posts')
   const [avatarUri, setAvatarUri] = useState(null)
   const [profile, setProfile] = useState(null)
@@ -606,7 +629,6 @@ export default function ProfileScreen() {
   const [medalPicker, setMedalPicker] = useState(null)
   const [stats, setStats] = useState({ nights: 0, friends: 0, met: 0 })
   const { user } = useAuth()
-  const { mode, toggleTheme } = useTheme()
 
   useEffect(() => {
     if (!user) return
@@ -697,9 +719,9 @@ export default function ProfileScreen() {
   ]
 
   return (
-    <LinearGradient colors={['#e8e8e8', '#ffffff']} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} style={{ flex: 1 }}>
-      <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-        <ScrollView bounces={true} contentContainerStyle={{ paddingBottom: 40 }}>
+    <LinearGradient colors={colors.backgroundGradient} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} style={{ flex: 1, backgroundColor: colors.background }}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'left', 'right']}>
+        <ScrollView bounces={true} contentContainerStyle={{ paddingBottom: 40, backgroundColor: colors.background, flexGrow: 1 }}>
           <View style={styles.topRow}>
             <View style={styles.leftCol}>
               <TouchableOpacity onPress={() => setShowAvatarModal(true)}>
@@ -710,32 +732,32 @@ export default function ProfileScreen() {
                 )}
               </TouchableOpacity>
               <View style={{ flex: 1 }}>
-  <View style={styles.nameRow}>
-    <Text style={styles.name}>{profile?.display_name || 'Loading...'}</Text>
-    <TouchableOpacity onPress={() => { setEditName(profile?.display_name || ''); setEditUsername(profile?.username || ''); setShowEditModal(true) }}>
-      <Text style={styles.editPencil}>✎</Text>
-    </TouchableOpacity>
-  </View>
-  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 2 }}>
-    <Text style={styles.username}>@{profile?.username || ''}</Text>
-    <TouchableOpacity
-      style={styles.signOutBtn}
-      onPress={() => {
-        if (Platform.OS === 'web') {
-          if (window.confirm('Are you sure you want to sign out?')) {
-            supabase.auth.signOut()
-          }
-        } else {
-          Alert.alert('Sign out', 'Are you sure you want to sign out?', [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Sign out', style: 'destructive', onPress: () => supabase.auth.signOut() },
-          ])
-        }
-      }}>
-      <Text style={styles.signOutText}>Sign out</Text>
-    </TouchableOpacity>
-  </View>
-</View>
+                <View style={styles.nameRow}>
+                  <Text style={styles.name}>{profile?.display_name || 'Loading...'}</Text>
+                  <TouchableOpacity onPress={() => { setEditName(profile?.display_name || ''); setEditUsername(profile?.username || ''); setShowEditModal(true) }}>
+                    <Text style={styles.editPencil}>✎</Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 2 }}>
+                  <Text style={styles.username}>@{profile?.username || ''}</Text>
+                  <TouchableOpacity
+                    style={styles.signOutBtn}
+                    onPress={() => {
+                      if (Platform.OS === 'web') {
+                        if (window.confirm('Are you sure you want to sign out?')) {
+                          supabase.auth.signOut()
+                        }
+                      } else {
+                        Alert.alert('Sign out', 'Are you sure you want to sign out?', [
+                          { text: 'Cancel', style: 'cancel' },
+                          { text: 'Sign out', style: 'destructive', onPress: () => supabase.auth.signOut() },
+                        ])
+                      }
+                    }}>
+                    <Text style={styles.signOutText}>Sign out</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
             </View>
             <View style={styles.statsRight}>
               <View style={styles.statItem}><Text style={styles.statNum}>{stats.nights}</Text><Text style={styles.statLabel}>Nights</Text></View>
@@ -799,24 +821,26 @@ export default function ProfileScreen() {
               {avatarUri ? (
                 <Image source={{ uri: avatarUri }} style={styles.editAvatarImg} />
               ) : (
-                <View style={styles.editAvatarImg}><Text style={{ fontSize: 24, color: '#ccc' }}>{editName ? editName.charAt(0).toUpperCase() : '?'}</Text></View>
+                <View style={styles.editAvatarImg}><Text style={{ fontSize: 24, color: colors.textMuted }}>{editName ? editName.charAt(0).toUpperCase() : '?'}</Text></View>
               )}
               <Text style={styles.editAvatarLabel}>Change photo</Text>
             </TouchableOpacity>
             <Text style={styles.editLabel}>Display name</Text>
-            <TextInput style={styles.editInput} value={editName} onChangeText={setEditName} placeholder="Display name" placeholderTextColor="#666" />
+            <TextInput style={styles.editInput} value={editName} onChangeText={setEditName} placeholder="Display name" placeholderTextColor={colors.textMuted} />
             <Text style={styles.editLabel}>Username</Text>
-            <TextInput style={styles.editInput} value={editUsername} onChangeText={setEditUsername} placeholder="Username" placeholderTextColor="#666" autoCapitalize="none" />
+            <TextInput style={styles.editInput} value={editUsername} onChangeText={setEditUsername} placeholder="Username" placeholderTextColor={colors.textMuted} autoCapitalize="none" />
+
+            <View style={styles.themeRow}>
+              <Text style={styles.editLabel}>Dark mode</Text>
+              <Switch
+                value={mode === 'dark'}
+                onValueChange={toggleTheme}
+                trackColor={{ false: '#ccc', true: '#1DB954' }}
+                thumbColor="#fff"
+              />
+            </View>
+
             <View style={styles.editModalBtns}>
-              <View style={styles.themeRow}>
-  <Text style={styles.editLabel}>Dark mode</Text>
-  <Switch
-    value={mode === 'dark'}
-    onValueChange={toggleTheme}
-    trackColor={{ false: '#ccc', true: '#1DB954' }}
-    thumbColor="#fff"
-  />
-</View>
               <TouchableOpacity style={styles.editCancelBtn} onPress={() => setShowEditModal(false)}><Text style={styles.editCancelText}>Cancel</Text></TouchableOpacity>
               <TouchableOpacity style={styles.editSaveBtn} onPress={saveProfileEdits}><Text style={styles.editSaveText}>Save</Text></TouchableOpacity>
             </View>
@@ -827,125 +851,131 @@ export default function ProfileScreen() {
   )
 }
 
-const filterStyles = StyleSheet.create({
-  backdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.4)' },
-  centerSheet: { position: 'absolute', top: '50%', left: SCREEN_WIDTH > 600 ? '25%' : 16, right: SCREEN_WIDTH > 600 ? '25%' : 16, transform: [{ translateY: -200 }], backgroundColor: '#fff', borderRadius: 20, padding: 20, borderWidth: 1.5, borderColor: '#888', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12 },
-  closeBtn: { position: 'absolute', top: 14, right: 14, width: 28, height: 28, borderRadius: 14, backgroundColor: '#f0f0f0', alignItems: 'center', justifyContent: 'center', zIndex: 10 },
-  closeBtnText: { color: '#666', fontSize: 13, fontWeight: '600' },
-  sheetTitle: { fontSize: 16, fontWeight: '700', color: '#111', marginBottom: 14, textAlign: 'center' },
-  sectionLabel: { fontSize: 11, color: '#444', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 8, marginTop: 14 },
-searchInput: { backgroundColor: '#dcd7d7', borderWidth: 1, borderColor: '#e0e0e0a4', borderRadius: 10, padding: 10, color: '#111', fontSize: 14 },
-peopleTextInput: { backgroundColor: '#dcd7d7', borderWidth: 1, borderColor: '#e0e0e0b4', borderRadius: 8, padding: 8, color: '#111', fontSize: 14, textAlign: 'center', width: '100%' },
-  peopleRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  peopleInput: { flex: 1, alignItems: 'center' },
-  peopleLabel: { fontSize: 11, color: '#555', marginBottom: 4 },
-  peopleDash: { fontSize: 16, color: '#ccc', marginTop: 16 },
-  friendsScroll: { marginTop: 4 },
-  friendChip: { alignItems: 'center', marginRight: 14, width: 56 },
-  friendAvatarWrap: { width: 48, height: 48, borderRadius: 24, borderWidth: 2, borderColor: 'transparent', overflow: 'hidden', marginBottom: 4 },
-  friendAvatarSelected: { borderColor: '#111' },
-  friendAvatar: { width: '100%', height: '100%' },
-  friendCheck: { position: 'absolute', bottom: 0, right: 0, width: 16, height: 16, borderRadius: 8, backgroundColor: '#111', alignItems: 'center', justifyContent: 'center' },
-  friendChipName: { fontSize: 10, color: '#444', textAlign: 'center' },
-  footer: { flexDirection: 'row', gap: 10, paddingTop: 14, marginTop: 14, borderTopWidth: 1, borderTopColor: '#f0f0f0' },
-  resetBtn: { flex: 1, borderWidth: .75, borderColor: '#444', borderRadius: 10, padding: 11, alignItems: 'center' },
-  resetBtnText: { color: '#666', fontSize: 13 },
-  applyBtn: { flex: 1, backgroundColor: '#111', borderRadius: 10, padding: 11, alignItems: 'center' },
-  applyBtnText: { color: '#fff', fontSize: 13, fontWeight: '600' },
-})
+function createFilterStyles(colors) {
+  return StyleSheet.create({
+    backdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.4)' },
+    centerSheet: { position: 'absolute', top: '50%', left: SCREEN_WIDTH > 600 ? '25%' : 16, right: SCREEN_WIDTH > 600 ? '25%' : 16, transform: [{ translateY: -200 }], backgroundColor: colors.cardBackground, borderRadius: 20, padding: 20, borderWidth: 1.5, borderColor: colors.borderStrong, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12 },
+    closeBtn: { position: 'absolute', top: 14, right: 14, width: 28, height: 28, borderRadius: 14, backgroundColor: colors.inputBackground, alignItems: 'center', justifyContent: 'center', zIndex: 10 },
+    closeBtnText: { color: colors.textSecondary, fontSize: 13, fontWeight: '600' },
+    sheetTitle: { fontSize: 16, fontWeight: '700', color: colors.text, marginBottom: 14, textAlign: 'center' },
+    sectionLabel: { fontSize: 11, color: colors.textSecondary, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 8, marginTop: 14 },
+    searchInput: { backgroundColor: colors.inputBackground, borderWidth: 1, borderColor: colors.border, borderRadius: 10, padding: 10, color: colors.text, fontSize: 14 },
+    peopleTextInput: { backgroundColor: colors.inputBackground, borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 8, color: colors.text, fontSize: 14, textAlign: 'center', width: '100%' },
+    peopleRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    peopleInput: { flex: 1, alignItems: 'center' },
+    peopleLabel: { fontSize: 11, color: colors.textSecondary, marginBottom: 4 },
+    peopleDash: { fontSize: 16, color: colors.textMuted, marginTop: 16 },
+    friendsScroll: { marginTop: 4 },
+    friendChip: { alignItems: 'center', marginRight: 14, width: 56 },
+    friendAvatarWrap: { width: 48, height: 48, borderRadius: 24, borderWidth: 2, borderColor: 'transparent', overflow: 'hidden', marginBottom: 4 },
+    friendAvatarSelected: { borderColor: colors.text },
+    friendAvatar: { width: '100%', height: '100%' },
+    friendCheck: { position: 'absolute', bottom: 0, right: 0, width: 16, height: 16, borderRadius: 8, backgroundColor: colors.buttonPrimary, alignItems: 'center', justifyContent: 'center' },
+    friendChipName: { fontSize: 10, color: colors.textSecondary, textAlign: 'center' },
+    footer: { flexDirection: 'row', gap: 10, paddingTop: 14, marginTop: 14, borderTopWidth: 1, borderTopColor: colors.border },
+    resetBtn: { flex: 1, borderWidth: .75, borderColor: colors.borderStrong, borderRadius: 10, padding: 11, alignItems: 'center' },
+    resetBtnText: { color: colors.textSecondary, fontSize: 13 },
+    applyBtn: { flex: 1, backgroundColor: colors.buttonPrimary, borderRadius: 10, padding: 11, alignItems: 'center' },
+    applyBtnText: { color: colors.buttonPrimaryText, fontSize: 13, fontWeight: '600' },
+  })
+}
 
-const nightStyles = StyleSheet.create({
-  filterRow: { flexDirection: 'row', gap: 8, marginBottom: 14, zIndex: 100 },
-  filterSearchBtn: { flex: 0.8, borderWidth: 1.25, borderColor: '#444', borderRadius: 10, padding: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' },
-  filterBtnActive: { backgroundColor: '#111', borderColor: '#111' },
-  filterBtnText: { color: '#444', fontSize: 13 },
-  filterBtnTextActive: { color: '#fff' },
-  sortWrap: { flex: 0.2, position: 'relative', zIndex: 100 },
-  sortOption: { padding: 12, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
-  sortOptionActive: { backgroundColor: '#f5f5f5' },
-  sortDropdown: { position: 'absolute', top: 44, left: 0, right: 0, backgroundColor: '#fff', borderRadius: 10, borderWidth: 1.5, borderColor: '#888', zIndex: 100, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8 },
-sortBtn: { borderWidth: 1.25, borderColor: '#444', borderRadius: 10, height: 40, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff', flexDirection: 'row', gap: 4, paddingHorizontal: 8 },
-sortBtnText: { fontSize: 12, color: '#333', fontWeight: '500' },
-sortOptionText: { fontSize: 12, color: '#333' },
-  card: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 12, marginBottom: 10, borderWidth: 1, borderColor: '#ebebeb', overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4 },
-  cardImage: { width: 90, height: 90 },
-  cardInfo: { flex: 1, padding: 12 },
-  cardName: { fontSize: 15, fontWeight: '600', color: '#111', marginBottom: 4 },
-  cardMeta: { fontSize: 12, color: '#555', marginBottom: 2 },
-  cardArrow: { fontSize: 20, color: '#ccc', paddingRight: 12 },
-  hofCard: { backgroundColor: '#fff', borderRadius: 12, marginBottom: 16, borderWidth: 1, borderColor: '#ebebeb', overflow: 'hidden', maxHeight: 220, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4 },
-  hofPhotoGrid: { flexDirection: 'row', flexWrap: 'wrap' },
-  hofCardInfo: { padding: 14 },
-  hofCardName: { fontSize: 17, fontWeight: '700', color: '#111', marginBottom: 4 },
-  hofCardMeta: { fontSize: 12, color: '#555', marginBottom: 4 },
-  hofCardHint: { fontSize: 10, color: '#666' },
-  modalHeader: { flexDirection: 'row', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#ebebeb', gap: 16 },
-  modalBack: { fontSize: 14, color: '#444' },
-  modalTitle: { fontSize: 18, fontWeight: '600', color: '#111' },
-  editOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'center', alignItems: 'center', padding: 24 },
-  editSheet: { backgroundColor: '#fff', borderRadius: 16, padding: 24, width: '100%', maxWidth: 360, borderWidth: 1, borderColor: '#ebebeb' },
-  editTitle: { fontSize: 18, fontWeight: '600', color: '#111', marginBottom: 16 },
-  editInput: { borderWidth: 1, borderColor: '#e0e0e0', borderRadius: 8, padding: 10, color: '#111', fontSize: 14, backgroundColor: '#f9f9f9', marginBottom: 16 },
-  editBtns: { flexDirection: 'row', gap: 10 },
-  editCancel: { flex: 1, borderWidth: 1, borderColor: '#666', borderRadius: 8, padding: 12, alignItems: 'center' },
-  editCancelText: { color: '#666', fontSize: 14 },
-  editSave: { flex: 1, backgroundColor: '#111', borderRadius: 8, padding: 12, alignItems: 'center' },
-  editSaveText: { color: '#fff', fontSize: 14, fontWeight: '600' },
-  pickerRow: { paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
-  pickerName: { fontSize: 15, fontWeight: '500', color: '#111', marginBottom: 2 },
-  pickerDate: { fontSize: 12, color: '#555' },
-  addBtn: { borderWidth: 1, borderColor: '#ddd', borderRadius: 10, padding: 14, alignItems: 'center', marginBottom: 16, backgroundColor: '#fff' },
-  addBtnText: { color: '#555', fontSize: 14 },
-})
+function createNightStyles(colors) {
+  return StyleSheet.create({
+    filterRow: { flexDirection: 'row', gap: 8, marginBottom: 14, zIndex: 100 },
+    filterSearchBtn: { flex: 0.8, borderWidth: 1.25, borderColor: colors.borderStrong, borderRadius: 10, padding: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.cardBackground },
+    filterBtnActive: { backgroundColor: colors.buttonPrimary, borderColor: colors.buttonPrimary },
+    filterBtnText: { color: colors.textSecondary, fontSize: 13 },
+    filterBtnTextActive: { color: colors.buttonPrimaryText },
+    sortWrap: { flex: 0.2, position: 'relative', zIndex: 100 },
+    sortOption: { padding: 12, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: colors.border },
+    sortOptionActive: { backgroundColor: colors.inputBackground },
+    sortDropdown: { position: 'absolute', top: 44, left: 0, right: 0, backgroundColor: colors.cardBackground, borderRadius: 10, borderWidth: 1.5, borderColor: colors.borderStrong, zIndex: 100, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8 },
+    sortBtn: { borderWidth: 1.25, borderColor: colors.borderStrong, borderRadius: 10, height: 40, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.cardBackground, flexDirection: 'row', gap: 4, paddingHorizontal: 8 },
+    sortBtnText: { fontSize: 12, color: colors.text, fontWeight: '500' },
+    sortOptionText: { fontSize: 12, color: colors.text },
+    card: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.cardBackground, borderRadius: 12, marginBottom: 10, borderWidth: 1, borderColor: colors.border, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4 },
+    cardImage: { width: 90, height: 90 },
+    cardInfo: { flex: 1, padding: 12 },
+    cardName: { fontSize: 15, fontWeight: '600', color: colors.text, marginBottom: 4 },
+    cardMeta: { fontSize: 12, color: colors.textSecondary, marginBottom: 2 },
+    cardArrow: { fontSize: 20, color: colors.textMuted, paddingRight: 12 },
+    hofCard: { backgroundColor: colors.cardBackground, borderRadius: 12, marginBottom: 16, borderWidth: 1, borderColor: colors.border, overflow: 'hidden', maxHeight: 220, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4 },
+    hofPhotoGrid: { flexDirection: 'row', flexWrap: 'wrap' },
+    hofCardInfo: { padding: 14 },
+    hofCardName: { fontSize: 17, fontWeight: '700', color: colors.text, marginBottom: 4 },
+    hofCardMeta: { fontSize: 12, color: colors.textSecondary, marginBottom: 4 },
+    hofCardHint: { fontSize: 10, color: colors.textMuted },
+    modalHeader: { flexDirection: 'row', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border, gap: 16 },
+    modalBack: { fontSize: 14, color: colors.textSecondary },
+    modalTitle: { fontSize: 18, fontWeight: '600', color: colors.text },
+    editOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+    editSheet: { backgroundColor: colors.cardBackground, borderRadius: 16, padding: 24, width: '100%', maxWidth: 360, borderWidth: 1, borderColor: colors.border },
+    editTitle: { fontSize: 18, fontWeight: '600', color: colors.text, marginBottom: 16 },
+    editInput: { borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 10, color: colors.text, fontSize: 14, backgroundColor: colors.inputBackground, marginBottom: 16 },
+    editBtns: { flexDirection: 'row', gap: 10 },
+    editCancel: { flex: 1, borderWidth: 1, borderColor: colors.borderStrong, borderRadius: 8, padding: 12, alignItems: 'center' },
+    editCancelText: { color: colors.textSecondary, fontSize: 14 },
+    editSave: { flex: 1, backgroundColor: colors.buttonPrimary, borderRadius: 8, padding: 12, alignItems: 'center' },
+    editSaveText: { color: colors.buttonPrimaryText, fontSize: 14, fontWeight: '600' },
+    pickerRow: { paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.border },
+    pickerName: { fontSize: 15, fontWeight: '500', color: colors.text, marginBottom: 2 },
+    pickerDate: { fontSize: 12, color: colors.textSecondary },
+    addBtn: { borderWidth: 1, borderColor: colors.borderStrong, borderRadius: 10, padding: 14, alignItems: 'center', marginBottom: 16, backgroundColor: colors.cardBackground },
+    addBtnText: { color: colors.textSecondary, fontSize: 14 },
+  })
+}
 
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 12, paddingHorizontal: 16, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: '#ebebeb' },
-  leftCol: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  avatarText: { fontSize: 20, fontWeight: '500', color: '#555' },
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  editPencil: { fontSize: 14, color: '#555' },
-  statItem: { alignItems: 'center' },
-  themeRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 16 },
-  avatar: { width: isMobile ? 52 : 70, height: isMobile ? 52 : 70, borderRadius: isMobile ? 26 : 35, backgroundColor: '#e8e8e8', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#ddd' },
-name: { fontSize: isMobile ? 15 : 20, fontWeight: '600', color: '#111' },
-username: { fontSize: isMobile ? 12 : 15, color: '#555', marginTop: 2 },
-statNum: { fontSize: isMobile ? 18 : 25, fontWeight: '600', color: '#111' },
-statLabel: { fontSize: isMobile ? 10 : 12, color: '#555', marginTop: 2 },
-statsRight: { flexDirection: 'row', gap: isMobile ? 10 : 16, alignItems: 'center' },
-signOutBtn: { position: 'absolute', right: isMobile ? -70 : -95, top: isMobile ? -12 : -18, borderWidth: 1, borderColor: '#e53935', borderRadius: 6, paddingHorizontal: isMobile ? 6 : 8, paddingVertical: 3 },
-signOutText: { color: '#e53935', fontSize: isMobile ? 9 : 11, fontWeight: '500' },
-medalCircle: { width: isMobile ? 60 : 80, height: isMobile ? 60 : 80, borderRadius: isMobile ? 30 : 40, alignItems: 'center', justifyContent: 'center', borderWidth: 2, overflow: 'hidden' },
-medalWrapper: { alignItems: 'center', gap: 4, width: isMobile ? 70 : 90 },
-medalEmoji: { fontSize: isMobile ? 18 : 24 },
-  medalsSection: { paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#ebebeb', alignItems: 'center' },
-  medalsRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 16 },
-  goldCircle: { borderColor: '#FFD700', backgroundColor: 'rgba(255,215,0,0.08)' },
-  silverCircle: { borderColor: '#B8B8B8', backgroundColor: 'rgba(184,184,184,0.08)' },
-  bronzeCircle: { borderColor: '#CD7F32', backgroundColor: 'rgba(205,127,50,0.08)' },
-  medalLabel: { fontSize: 9, color: '#555', fontWeight: '500', letterSpacing: 0.5, textAlign: 'center' },
-  tabs: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#ebebeb' },
-  tab: { flex: 1, paddingVertical: 11, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
-  tabActive: { borderBottomColor: '#111' },
-  tabText: { fontSize: 11, color: '#555' },
-  tabTextActive: { color: '#111', fontWeight: '600' },
-  emptyState: { alignItems: 'center', paddingTop: 48, paddingBottom: 40 },
-  emptyText: { fontSize: 15, color: '#333', marginBottom: 6 },
-  emptySubtext: { fontSize: 12, color: '#555' },
-  avatarModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', alignItems: 'center', justifyContent: 'center' },
-  avatarModalImage: { width: 280, height: 280, borderRadius: 140 },
-  avatarModalPlaceholder: { width: 280, height: 280, borderRadius: 140, backgroundColor: '#333', alignItems: 'center', justifyContent: 'center' },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'center', alignItems: 'center', padding: 24 },
-  editModalSheet: { backgroundColor: '#fff', borderRadius: 16, padding: 24, width: '100%', maxWidth: 360, borderWidth: 1, borderColor: '#ebebeb' },
-  editModalTitle: { fontSize: 18, fontWeight: '600', color: '#111', marginBottom: 20 },
-  editAvatarRow: { alignItems: 'center', marginBottom: 20 },
-  editAvatarImg: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#e8e8e8', alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
-  editAvatarLabel: { fontSize: 12, color: '#444' },
-  editLabel: { fontSize: 11, color: '#444', marginBottom: 6, marginTop: 12 },
-  editInput: { borderWidth: 1, borderColor: '#e0e0e0', borderRadius: 8, padding: 10, color: '#111', fontSize: 14, backgroundColor: '#f9f9f9' },
-  editModalBtns: { flexDirection: 'row', gap: 10, marginTop: 24 },
-  editCancelBtn: { flex: 1, borderWidth: 1, borderColor: '#e0e0e0', borderRadius: 8, padding: 12, alignItems: 'center' },
-  editCancelText: { color: '#666', fontSize: 14 },
-  editSaveBtn: { flex: 1, backgroundColor: '#111', borderRadius: 8, padding: 12, alignItems: 'center' },
-  editSaveText: { color: '#fff', fontSize: 14, fontWeight: '600' },
-})
+function createStyles(colors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 12, paddingHorizontal: 16, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: colors.border },
+    leftCol: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    avatarText: { fontSize: 20, fontWeight: '500', color: colors.textSecondary },
+    nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    editPencil: { fontSize: 14, color: colors.textSecondary },
+    statItem: { alignItems: 'center' },
+    themeRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 16 },
+    avatar: { width: isMobile ? 52 : 70, height: isMobile ? 52 : 70, borderRadius: isMobile ? 26 : 35, backgroundColor: colors.inputBackground, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.borderStrong },
+    name: { fontSize: isMobile ? 15 : 20, fontWeight: '600', color: colors.text },
+    username: { fontSize: isMobile ? 12 : 15, color: colors.textSecondary, marginTop: 2 },
+    statNum: { fontSize: isMobile ? 18 : 25, fontWeight: '600', color: colors.text },
+    statLabel: { fontSize: isMobile ? 10 : 12, color: colors.textSecondary, marginTop: 2 },
+    statsRight: { flexDirection: 'row', gap: isMobile ? 10 : 16, alignItems: 'center' },
+    signOutBtn: { position: 'absolute', right: isMobile ? -70 : -95, top: isMobile ? -12 : -18, borderWidth: 1, borderColor: colors.danger, borderRadius: 6, paddingHorizontal: isMobile ? 6 : 8, paddingVertical: 3 },
+    signOutText: { color: colors.danger, fontSize: isMobile ? 9 : 11, fontWeight: '500' },
+    medalCircle: { width: isMobile ? 60 : 80, height: isMobile ? 60 : 80, borderRadius: isMobile ? 30 : 40, alignItems: 'center', justifyContent: 'center', borderWidth: 2, overflow: 'hidden' },
+    medalWrapper: { alignItems: 'center', gap: 4, width: isMobile ? 70 : 90 },
+    medalEmoji: { fontSize: isMobile ? 18 : 24 },
+    medalsSection: { paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: colors.border, alignItems: 'center' },
+    medalsRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 16 },
+    goldCircle: { borderColor: '#FFD700', backgroundColor: 'rgba(255,215,0,0.08)' },
+    silverCircle: { borderColor: '#B8B8B8', backgroundColor: 'rgba(184,184,184,0.08)' },
+    bronzeCircle: { borderColor: '#CD7F32', backgroundColor: 'rgba(205,127,50,0.08)' },
+    medalLabel: { fontSize: 9, color: colors.textSecondary, fontWeight: '500', letterSpacing: 0.5, textAlign: 'center' },
+    tabs: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border },
+    tab: { flex: 1, paddingVertical: 11, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
+    tabActive: { borderBottomColor: colors.text },
+    tabText: { fontSize: 11, color: colors.textSecondary },
+    tabTextActive: { color: colors.text, fontWeight: '600' },
+    emptyState: { alignItems: 'center', paddingTop: 48, paddingBottom: 40 },
+    emptyText: { fontSize: 15, color: colors.text, marginBottom: 6 },
+    emptySubtext: { fontSize: 12, color: colors.textSecondary },
+    avatarModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', alignItems: 'center', justifyContent: 'center' },
+    avatarModalImage: { width: 280, height: 280, borderRadius: 140 },
+    avatarModalPlaceholder: { width: 280, height: 280, borderRadius: 140, backgroundColor: '#333', alignItems: 'center', justifyContent: 'center' },
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+    editModalSheet: { backgroundColor: colors.cardBackground, borderRadius: 16, padding: 24, width: '100%', maxWidth: 360, borderWidth: 1, borderColor: colors.border },
+    editModalTitle: { fontSize: 18, fontWeight: '600', color: colors.text, marginBottom: 20 },
+    editAvatarRow: { alignItems: 'center', marginBottom: 20 },
+    editAvatarImg: { width: 64, height: 64, borderRadius: 32, backgroundColor: colors.inputBackground, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
+    editAvatarLabel: { fontSize: 12, color: colors.textSecondary },
+    editLabel: { fontSize: 11, color: colors.textSecondary, marginBottom: 6, marginTop: 12 },
+    editInput: { borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 10, color: colors.text, fontSize: 14, backgroundColor: colors.inputBackground },
+    editModalBtns: { flexDirection: 'row', gap: 10, marginTop: 24 },
+    editCancelBtn: { flex: 1, borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 12, alignItems: 'center' },
+    editCancelText: { color: colors.textSecondary, fontSize: 14 },
+    editSaveBtn: { flex: 1, backgroundColor: colors.buttonPrimary, borderRadius: 8, padding: 12, alignItems: 'center' },
+    editSaveText: { color: colors.buttonPrimaryText, fontSize: 14, fontWeight: '600' },
+  })
+}
