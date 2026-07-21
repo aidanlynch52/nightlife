@@ -1,4 +1,4 @@
-import { router } from 'expo-router'
+import { router, useLocalSearchParams } from 'expo-router'
 import * as WebBrowser from 'expo-web-browser'
 import { useEffect, useState } from 'react'
 import { Text, View } from 'react-native'
@@ -6,12 +6,16 @@ import { Text, View } from 'react-native'
 WebBrowser.maybeCompleteAuthSession()
 
 export default function SpotifyCallbackScreen() {
-  const [status, setStatus] = useState('connecting')
+  const { code } = useLocalSearchParams()
+  const [status, setStatus] = useState(code ? 'connecting' : 'waiting')
 
   useEffect(() => {
+    if (!code) return
     setTimeout(() => setStatus('success'), 500)
     setTimeout(() => router.replace('/(tabs)/profile'), 2500)
-  }, [])
+  }, [code])
+
+  if (!code) return null
 
   return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: status === 'success' ? '#1DB954' : '#000' }}>
