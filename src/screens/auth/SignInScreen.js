@@ -34,12 +34,23 @@ export default function SignInScreen() {
     return () => clearTimeout(timer)
   }, [username, mode])
 
+  function getErrorMessage(error) {
+  const msg = error?.message?.toLowerCase() || ''
+  if (msg.includes('invalid login credentials') || msg.includes('invalid password')) return 'Incorrect email or password'
+  if (msg.includes('email not confirmed')) return 'Please confirm your email first'
+  if (msg.includes('user already registered') || msg.includes('already been registered')) return 'An account with this email already exists'
+  if (msg.includes('password should be at least')) return 'Password must be at least 6 characters'
+  if (msg.includes('unable to validate email')) return 'Please enter a valid email address'
+  if (msg.includes('rate limit')) return 'Too many attempts — please wait a moment'
+  return 'Something went wrong. Please try again.'
+}
+
   async function handleSubmit() {
     setLoading(true)
     setError('')
     if (mode === 'signin') {
       const { error } = await signIn(email, password)
-      if (error) setError(JSON.stringify(error))
+      if (error) setError(getErrorMessage(error))
       else router.replace('/(tabs)/home')
     } else {
       if (!username.trim()) { setError('Please enter a username'); setLoading(false); return }
@@ -51,7 +62,7 @@ export default function SignInScreen() {
         .maybeSingle()
       if (existing) { setError('That username is already taken'); setLoading(false); return }
       const { error } = await signUp(email, password, username.trim(), displayName)
-      if (error) setError(JSON.stringify(error))
+      if (error) setError(getErrorMessage(error))
       else router.replace('/spotify-onboarding')
     }
     setLoading(false)

@@ -540,7 +540,7 @@ function PostsTab({ userId }) {
   )
 }
 function StatsTab() {
-  const { connected, connectSpotify, disconnect } = useSpotify()
+  const { connected, connectSpotify, disconnect, spotifyProfile } = useSpotify()
   const [showSpotifyModal, setShowSpotifyModal] = useState(false)
 
   return (
@@ -548,10 +548,15 @@ function StatsTab() {
       <View style={{ flexDirection: 'row', justifyContent: 'flex-end', padding: 16 }}>
         {connected ? (
           <TouchableOpacity
-            style={{ backgroundColor: '#1DB954', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8 }}
-            onPress={() => setShowSpotifyModal(true)}>
-            <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>● Spotify Connected</Text>
-          </TouchableOpacity>
+  style={{ backgroundColor: '#1DB954', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 8 }}
+  onPress={() => setShowSpotifyModal(true)}>
+  {spotifyProfile?.images?.[0]?.url ? (
+    <Image source={{ uri: spotifyProfile.images[0].url }} style={{ width: 20, height: 20, borderRadius: 10 }} />
+  ) : (
+    <Text style={{ color: '#fff', fontSize: 10 }}>●</Text>
+  )}
+  <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>Spotify Connected</Text>
+</TouchableOpacity>
         ) : (
           <TouchableOpacity
             style={{ borderWidth: 1, borderColor: '#1DB954', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8 }}
