@@ -17,33 +17,51 @@ export default function JoinScreen() {
     handleJoin()
   }, [token, user])
 
-  async function handleJoin() {
-    const { data: event } = await supabase
-      .from('events')
-      .select('id, name, status')
-      .eq('qr_code_token', token)
-      .single()
+async function handleJoin() {
+  const { data: event, error } = await supabase
+    .from('events')
+    .select('id, name, status, qr_code_token, host_id')
+    .eq('qr_code_token', token)
+    .single()
 
-    if (!event) { setStatus('notfound'); return }
-    if (event.status !== 'open') { setStatus('closed'); return }
+  if (error || !event) { setStatus('notfound'); return }
+  if (event.status !== 'open' && event.status !== 'active') { setStatus('closed'); return }
 
-    const { data: existing } = await supabase
-      .from('event_attendees')
-      .select('id')
-      .eq('event_id', event.id)
-      .eq('user_id', user.id)
-      .single()
+  const { data: { user: authUser } } = await supabase.auth.getUser()
 
-    if (!existing) {
-      await supabase.from('event_attendees').insert({
-        event_id: event.id,
-        user_id: user.id,
-      })
-    }
+  const { data: existing } = await supabase
+    .from('event_attendees')
+    .select('id')
+    .eq('event_id', event.id)
+    .eq('user_id', authUser.id)
+    .maybeSingle()
 
-    await joinNight(event.id)
-    router.replace('/(tabs)/camera')
+  if (!existing) {
+    await supabase.from('event_attendees').insert({
+      event_id: event.id,
+      user_id: authUser.id,
+    })
   }
+
+  const isHost = event.host_id === authUser.id
+  const { data: cohost } = await supabase
+    .from('event_hosts')
+    .select('id')
+    .eq('event_id', event.id)
+    .eq('user_id', authUser.id)
+    .maybeSingle()
+
+  const role = isHost ? 'host' : cohost ? 'cohost' : 'attendee'
+
+  await joinNight({
+    id: event.id,
+    name: event.name,
+    qrToken: event.qr_code_token,
+    role,
+  })
+
+  router.replace('/(tabs)/camera')
+}
 
   return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' }}>
