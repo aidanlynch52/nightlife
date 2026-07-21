@@ -1,5 +1,8 @@
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+
+const LOGIN_TIMESTAMP_KEY = 'nightlife_login_timestamp'
 
 export function useAuth() {
   const [user, setUser] = useState(null)
@@ -32,6 +35,9 @@ export function useAuth() {
 
   async function signIn(email, password) {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
+    if (!error) {
+      await AsyncStorage.setItem(LOGIN_TIMESTAMP_KEY, Date.now().toString())
+    }
     return { error }
   }
 
@@ -43,10 +49,14 @@ export function useAuth() {
         data: { username, display_name: displayName }
       }
     })
+    if (!error) {
+      await AsyncStorage.setItem(LOGIN_TIMESTAMP_KEY, Date.now().toString())
+    }
     return { error }
   }
 
   async function signOut() {
+    await AsyncStorage.removeItem(LOGIN_TIMESTAMP_KEY)
     await supabase.auth.signOut()
   }
 
