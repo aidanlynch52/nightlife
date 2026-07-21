@@ -1,7 +1,7 @@
 import { exchangeCodeAsync, makeRedirectUri, refreshAsync, useAuthRequest } from 'expo-auth-session'
 import * as WebBrowser from 'expo-web-browser'
 import { useEffect, useState } from 'react'
-import { Platform } from 'react-native'
+import { Linking, Platform } from 'react-native'
 import { supabase } from '../lib/supabase'
 import { useAuth } from './useAuth'
 
@@ -140,13 +140,24 @@ export function useSpotify() {
     setConnected(false)
   }
 
-  return {
-    connected,
-    loading,
-    accessToken,
-    connectSpotify: () => promptAsync(),
-    addToQueue,
-    searchTracks,
-    disconnect,
-  }
-}
+return {
+  connected,
+  loading,
+  accessToken,
+  connectSpotify: () => {
+    if (Platform.OS !== 'web') {
+      const params = new URLSearchParams({
+        client_id: SPOTIFY_CLIENT_ID,
+        response_type: 'code',
+        redirect_uri: process.env.EXPO_PUBLIC_SPOTIFY_REDIRECT_URI,
+        scope: SCOPES.join(' '),
+      })
+      Linking.openURL(`spotify://authorize?${params.toString()}`).catch(() => promptAsync())
+    } else {
+      promptAsync()
+    }
+  },
+  addToQueue,
+  searchTracks,
+  disconnect,
+}}

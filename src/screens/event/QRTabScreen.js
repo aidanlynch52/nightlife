@@ -173,9 +173,14 @@ export default function QRTabScreen() {
         <View style={styles.header}>
           <Text style={styles.title}>{activeNight?.name}</Text>
           <View style={styles.headerRight}>
-            <TouchableOpacity style={styles.peopleBtn} onPress={loadAttendees}>
-              <Text style={styles.peopleBtnText}>👥</Text>
-            </TouchableOpacity>
+  {SCREEN_WIDTH <= 600 && (
+    <TouchableOpacity style={styles.peopleBtn} onPress={() => router.push('/(tabs)/messages')}>
+      <Text style={styles.peopleBtnText}>💬</Text>
+    </TouchableOpacity>
+  )}
+  <TouchableOpacity style={styles.peopleBtn} onPress={loadAttendees}>
+    <Text style={styles.peopleBtnText}>👥</Text>
+  </TouchableOpacity>
             <TouchableOpacity style={styles.endBtn} onPress={handleEndOrLeave}>
               <Text style={styles.endBtnText}>
                 {activeNight?.role === 'host' || activeNight?.role === 'cohost' ? 'End Event' : 'Leave'}
@@ -370,7 +375,7 @@ const styles = StyleSheet.create({
   spotifyConnected: { backgroundColor: 'rgba(30,215,96,0.08)', borderWidth: 1, borderColor: 'rgba(30,215,96,0.3)', borderRadius: 10, padding: 10, marginBottom: 12, alignItems: 'center' },
   spotifyConnectedText: { fontSize: 12, color: '#1aa34a' },
   header: { alignItems: 'center', marginBottom: 32, position: 'relative' },
-  title: { fontSize: 28, fontWeight: '700', color: '#111', textAlign: 'center' },
+  title: { fontSize: SCREEN_WIDTH > 600 ? 28 : 0, fontWeight: '700', color: '#111', textAlign: 'center', height: SCREEN_WIDTH > 600 ? 'auto' : 0 },
   headerRight: { position: 'absolute', right: 0, top: 0, flexDirection: 'row', alignItems: 'center', gap: 8 },
   peopleBtn: { borderWidth: 1.5, borderColor: '#888', borderRadius: 8, paddingHorizontal: SCREEN_WIDTH > 600 ? 10 : 7, paddingVertical: SCREEN_WIDTH > 600 ? 7 : 4, backgroundColor: '#fff', justifyContent: 'center' },
   peopleBtnText: { fontSize: SCREEN_WIDTH > 600 ? 16 : 13 },

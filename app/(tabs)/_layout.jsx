@@ -3,6 +3,7 @@ import { Dimensions, Text, TouchableOpacity, View } from 'react-native'
 import { useNight } from '../../src/lib/NightContext.js'
 
 const TAB_HEIGHT = Dimensions.get('window').height * 0.065
+const SCREEN_WIDTH = Dimensions.get('window').width
 
 function TabBar({ state, descriptors, navigation }) {
   const { activeNight } = useNight()
@@ -16,26 +17,34 @@ function TabBar({ state, descriptors, navigation }) {
     { name: 'create', label: 'Night' },
     { name: 'profile', label: 'Profile' },
   ]
-
-  if (isInNight && isHost) {
-    tabs = [
-      { name: 'home', label: 'Home' },
-      { name: 'messages', label: 'Messages' },
-      { name: 'camera', label: 'Camera' },
-      { name: 'catalog', label: 'Catalog' },
-      { name: 'qr', label: activeNight?.name || 'QR' },
-      { name: 'profile', label: 'Profile' },
-    ]
-  } else if (isInNight) {
-    tabs = [
-      { name: 'home', label: 'Home' },
-      { name: 'messages', label: 'Messages' },
-      { name: 'camera', label: 'Camera' },
-      { name: 'catalog', label: 'Catalog' },
-      { name: 'profile', label: 'Profile' },
-    ]
-  }
-
+if (isInNight && isHost) {
+  tabs = SCREEN_WIDTH > 600 ? [
+    { name: 'home', label: 'Home' },
+    { name: 'messages', label: 'Messages' },
+    { name: 'camera', label: 'Camera' },
+    { name: 'catalog', label: 'Catalog' },
+    { name: 'qr', label: activeNight?.name || 'QR' },
+    { name: 'profile', label: 'Profile' },
+  ] : [
+    { name: 'home', label: 'Home' },
+    { name: 'camera', label: 'Camera' },
+    { name: 'qr', label: 'Night' },
+    { name: 'profile', label: 'Profile' },
+  ]
+} else if (isInNight) {
+  tabs = SCREEN_WIDTH > 600 ? [
+    { name: 'home', label: 'Home' },
+    { name: 'messages', label: 'Messages' },
+    { name: 'camera', label: 'Camera' },
+    { name: 'catalog', label: 'Catalog' },
+    { name: 'profile', label: 'Profile' },
+  ] : [
+    { name: 'home', label: 'Home' },
+    { name: 'camera', label: 'Camera' },
+    { name: 'qr', label: 'Night' },
+    { name: 'profile', label: 'Profile' },
+  ]
+}
   return (
     <View style={{
       flexDirection: 'row',

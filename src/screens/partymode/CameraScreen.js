@@ -3,7 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient'
 import { useIsFocused } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
 import {
-  Animated, Dimensions,
+  Animated, Dimensions, FlatList,
   PanResponder, Platform,
   Image as RNImage,
   StyleSheet, Text, TouchableOpacity, View
@@ -14,6 +14,10 @@ import { useNight } from '../../lib/NightContext'
 import { supabase } from '../../lib/supabase'
 
 const { width, height } = Dimensions.get('window')
+const isMobile = width < 600
+const COLUMNS = 3
+const GAP = 2
+const TILE_SIZE = (width - GAP * (COLUMNS - 1)) / COLUMNS
 
 function DigitalTimestamp() {
   const [time, setTime] = useState(new Date())
@@ -36,19 +40,69 @@ function GrainOverlay() {
   return (
     <View style={styles.grainOverlay} pointerEvents="none">
       {Array.from({ length: 80 }).map((_, i) => (
-        <View
-          key={i}
-          style={{
-            position: 'absolute',
-            left: `${Math.random() * 100}%`,
-            top: `${Math.random() * 100}%`,
-            width: Math.random() * 3 + 1,
-            height: Math.random() * 3 + 1,
-            borderRadius: 1,
-            backgroundColor: `rgba(255,255,255,${Math.random() * 0.08})`,
-          }}
-        />
+        <View key={i} style={{
+          position: 'absolute',
+          left: `${Math.random() * 100}%`,
+          top: `${Math.random() * 100}%`,
+          width: Math.random() * 3 + 1,
+          height: Math.random() * 3 + 1,
+          borderRadius: 1,
+          backgroundColor: `rgba(255,255,255,${Math.random() * 0.08})`,
+        }} />
       ))}
+    </View>
+  )
+}
+
+function GridIcon() {
+  return (
+    <View style={{ width: 22, height: 22, position: 'relative' }}>
+      <View style={{ position: 'absolute', left: 0, top: 3, width: 14, height: 14, borderWidth: 2, borderColor: '#fff', borderRadius: 2, backgroundColor: 'transparent' }} />
+      <View style={{ position: 'absolute', left: 6, top: 0, width: 14, height: 14, borderWidth: 2, borderColor: '#fff', borderRadius: 2, backgroundColor: 'rgba(0,0,0,0.4)' }} />
+    </View>
+  )
+}
+
+function CatalogView({ onBack }) {
+  const { activeNight } = useNight()
+  const [photos, setPhotos] = useState([])
+
+  useEffect(() => {
+    if (!activeNight?.id) return
+    supabase.from('photos').select('id, storage_path').eq('event_id', activeNight.id).order('created_at', { ascending: false }).then(({ data }) => setPhotos(data || []))
+  }, [activeNight?.id])
+
+  function getPhotoUrl(path) {
+    const { data } = supabase.storage.from('Photos').getPublicUrl(path)
+    return data.publicUrl
+  }
+
+  return (
+    <View style={{ flex: 1, backgroundColor: '#fff' }}>
+      <SafeAreaView edges={['top']} style={{ backgroundColor: '#fff' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#ebebeb' }}>
+          <TouchableOpacity onPress={onBack} style={{ marginRight: 12 }}>
+            <Text style={{ fontSize: 22, color: '#111' }}>←</Text>
+          </TouchableOpacity>
+          <Text style={{ fontSize: 18, fontWeight: '700', color: '#111' }}>Catalog</Text>
+        </View>
+      </SafeAreaView>
+      <FlatList
+        data={photos}
+        numColumns={COLUMNS}
+        keyExtractor={item => item.id}
+        renderItem={({ item }) => (
+          <RNImage
+            source={{ uri: getPhotoUrl(item.storage_path) }}
+            style={{ width: TILE_SIZE, height: TILE_SIZE, marginRight: GAP, marginBottom: GAP }}
+          />
+        )}
+        ListEmptyComponent={
+          <View style={{ alignItems: 'center', paddingTop: 60 }}>
+            <Text style={{ color: '#888', fontSize: 15 }}>No photos yet</Text>
+          </View>
+        }
+      />
     </View>
   )
 }
@@ -62,10 +116,12 @@ export default function CameraScreen() {
   const [recording, setRecording] = useState(false)
   const [recordProgress, setRecordProgress] = useState(0)
   const [uploading, setUploading] = useState(false)
+  const [showCatalog, setShowCatalog] = useState(false)
   const cameraRef = useRef(null)
   const recordTimer = useRef(null)
   const isRecording = useRef(false)
   const slideAnim = useRef(new Animated.Value(0)).current
+  const catalogSlideAnim = useRef(new Animated.Value(width)).current
   const { activeNight } = useNight()
   const { user } = useAuth()
   const isFocused = useIsFocused()
@@ -74,57 +130,59 @@ export default function CameraScreen() {
 
   useEffect(() => {
     if (!isFocused) {
-      if (recordTimer.current) {
-        clearInterval(recordTimer.current)
-        recordTimer.current = null
-      }
+      if (recordTimer.current) { clearInterval(recordTimer.current); recordTimer.current = null }
       isRecording.current = false
       setRecording(false)
       setRecordProgress(0)
       return
     }
-
     if (!cameraPermission?.granted) requestCameraPermission()
     if (!micPermission?.granted) requestMicPermission()
-
     return () => {
-      if (recordTimer.current) {
-        clearInterval(recordTimer.current)
-        recordTimer.current = null
-      }
+      if (recordTimer.current) { clearInterval(recordTimer.current); recordTimer.current = null }
       isRecording.current = false
       setRecording(false)
       setRecordProgress(0)
       if (typeof cameraRef.current?.stopRecording === 'function') {
-        try {
-          cameraRef.current.stopRecording()
-        } catch (e) {
-          console.warn('Camera cleanup warning:', e)
-        }
+        try { cameraRef.current.stopRecording() } catch (e) {}
       }
     }
-  }, [isFocused, cameraPermission?.granted, micPermission?.granted, requestCameraPermission, requestMicPermission])
+  }, [isFocused, cameraPermission?.granted, micPermission?.granted])
 
-  const panResponder = PanResponder.create({
-    onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dy) > 10,
-    onPanResponderMove: (_, g) => {
-      if (g.dy > 0) slideAnim.setValue(g.dy)
-    },
+  function openCatalog() {
+    setShowCatalog(true)
+    Animated.spring(catalogSlideAnim, { toValue: 0, useNativeDriver: true }).start()
+  }
+
+  function closeCatalog() {
+    Animated.timing(catalogSlideAnim, { toValue: width, duration: 250, useNativeDriver: true }).start(() => setShowCatalog(false))
+  }
+
+  const cameraPanResponder = isMobile ? PanResponder.create({
+    onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 15 && Math.abs(g.dx) > Math.abs(g.dy),
     onPanResponderRelease: (_, g) => {
-      if (g.dy > 120) {
-        discardPreview()
-      } else {
-        Animated.spring(slideAnim, { toValue: 0, useNativeDriver: false }).start()
-      }
+      if (g.dx > 80) openCatalog()
+    },
+  }) : { panHandlers: {} }
+
+  const catalogPanResponder = isMobile ? PanResponder.create({
+    onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 15 && Math.abs(g.dx) > Math.abs(g.dy),
+    onPanResponderRelease: (_, g) => {
+      if (g.dx < -80) closeCatalog()
+    },
+  }) : { panHandlers: {} }
+
+  const previewPanResponder = PanResponder.create({
+    onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dy) > 10,
+    onPanResponderMove: (_, g) => { if (g.dy > 0) slideAnim.setValue(g.dy) },
+    onPanResponderRelease: (_, g) => {
+      if (g.dy > 120) discardPreview()
+      else Animated.spring(slideAnim, { toValue: 0, useNativeDriver: false }).start()
     },
   })
 
   function discardPreview() {
-    Animated.timing(slideAnim, {
-      toValue: height,
-      duration: 250,
-      useNativeDriver: false,
-    }).start(() => {
+    Animated.timing(slideAnim, { toValue: height, duration: 250, useNativeDriver: false }).start(() => {
       setPreview(null)
       slideAnim.setValue(0)
     })
@@ -135,12 +193,9 @@ export default function CameraScreen() {
       const img = new window.Image()
       img.onload = () => {
         const canvas = document.createElement('canvas')
-        canvas.width = img.width
-        canvas.height = img.height
+        canvas.width = img.width; canvas.height = img.height
         const ctx = canvas.getContext('2d')
-        ctx.translate(img.width, 0)
-        ctx.scale(-1, 1)
-        ctx.drawImage(img, 0, 0)
+        ctx.translate(img.width, 0); ctx.scale(-1, 1); ctx.drawImage(img, 0, 0)
         resolve(canvas.toDataURL('image/jpeg', 0.85))
       }
       img.src = uri
@@ -152,13 +207,9 @@ export default function CameraScreen() {
     try {
       const photo = await cameraRef.current.takePictureAsync({ quality: 0.85 })
       let uri = photo.uri
-      if (Platform.OS === 'web' && facing === 'front') {
-        uri = await flipImageHorizontally(uri)
-      }
+      if (Platform.OS === 'web' && facing === 'front') uri = await flipImageHorizontally(uri)
       setPreview({ uri, type: 'photo', lens, facing })
-    } catch (e) {
-      console.error('Photo error:', e)
-    }
+    } catch (e) { console.error('Photo error:', e) }
   }
 
   async function startRecording() {
@@ -174,12 +225,9 @@ export default function CameraScreen() {
     }, 100)
     try {
       const video = await cameraRef.current.recordAsync({ maxDuration: MAX_RECORD_SECONDS })
-      if (video?.uri) {
-        setPreview({ uri: video.uri, type: 'video', lens, facing })
-      }
-    } catch (e) {
-      console.error('Video error:', e)
-    } finally {
+      if (video?.uri) setPreview({ uri: video.uri, type: 'video', lens, facing })
+    } catch (e) { console.error('Video error:', e) }
+    finally {
       isRecording.current = false
       setRecording(false)
     }
@@ -187,16 +235,11 @@ export default function CameraScreen() {
 
   function stopRecording() {
     if (!isRecording.current) return
-    if (recordTimer.current) {
-      clearInterval(recordTimer.current)
-      recordTimer.current = null
-    }
+    if (recordTimer.current) { clearInterval(recordTimer.current); recordTimer.current = null }
     isRecording.current = false
     setRecording(false)
     setRecordProgress(0)
-    if (typeof cameraRef.current?.stopRecording === 'function') {
-      cameraRef.current.stopRecording()
-    }
+    if (typeof cameraRef.current?.stopRecording === 'function') cameraRef.current.stopRecording()
   }
 
   async function sendToCatalog() {
@@ -207,11 +250,9 @@ export default function CameraScreen() {
       const fileName = `${activeNight.id}/${user.id}/${Date.now()}_${lens}.${ext}`
       const res = await fetch(preview.uri)
       const blob = await res.blob()
-      const { error: uploadError } = await supabase.storage
-        .from('Photos')
-        .upload(fileName, blob, {
-          contentType: preview.type === 'video' ? 'video/mp4' : 'image/jpeg',
-        })
+      const { error: uploadError } = await supabase.storage.from('Photos').upload(fileName, blob, {
+        contentType: preview.type === 'video' ? 'video/mp4' : 'image/jpeg',
+      })
       if (uploadError) { console.error('Upload error:', uploadError); setUploading(false); return }
       await supabase.from('photos').insert({
         event_id: activeNight.id,
@@ -223,14 +264,11 @@ export default function CameraScreen() {
       })
       setPreview(null)
       slideAnim.setValue(0)
-    } catch (e) {
-      console.error('Send error:', e)
-    }
+    } catch (e) { console.error('Send error:', e) }
     setUploading(false)
   }
 
   if (!isFocused) return <View style={styles.container} />
-
   if (!cameraPermission) return <View style={styles.container} />
 
   if (!cameraPermission.granted) {
@@ -247,14 +285,13 @@ export default function CameraScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={styles.container} {...cameraPanResponder.panHandlers}>
       {isFocused && (
         <CameraView
           ref={cameraRef}
           style={[StyleSheet.absoluteFill, facing === 'front' && { transform: [{ scaleX: -1 }] }]}
           facing={facing}
-          mode="picture"
-        >
+          mode="picture">
           {lens === 'digital' && (
             <>
               <View style={styles.digitalWarm} pointerEvents="none" />
@@ -265,20 +302,23 @@ export default function CameraScreen() {
 
           <SafeAreaView style={styles.topBar} edges={['top']}>
             <View style={styles.lensToggle}>
-              <TouchableOpacity
-                style={[styles.lensBtn, lens === 'standard' && styles.lensBtnActive]}
-                onPress={() => setLens('standard')}>
+              <TouchableOpacity style={[styles.lensBtn, lens === 'standard' && styles.lensBtnActive]} onPress={() => setLens('standard')}>
                 <Text style={[styles.lensBtnText, lens === 'standard' && styles.lensBtnTextActive]}>Standard</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.lensBtn, lens === 'digital' && styles.lensBtnActive]}
-                onPress={() => setLens('digital')}>
+              <TouchableOpacity style={[styles.lensBtn, lens === 'digital' && styles.lensBtnActive]} onPress={() => setLens('digital')}>
                 <Text style={[styles.lensBtnText, lens === 'digital' && styles.lensBtnTextActive]}>Digital</Text>
               </TouchableOpacity>
             </View>
-            <TouchableOpacity style={styles.flipBtn} onPress={() => setFacing(f => f === 'back' ? 'front' : 'back')}>
-              <Text style={styles.flipText}>⇄</Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
+              {isMobile && (
+                <TouchableOpacity style={styles.flipBtn} onPress={openCatalog}>
+                  <GridIcon />
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity style={styles.flipBtn} onPress={() => setFacing(f => f === 'back' ? 'front' : 'back')}>
+                <Text style={styles.flipText}>⇄</Text>
+              </TouchableOpacity>
+            </View>
           </SafeAreaView>
 
           {recording && (
@@ -300,23 +340,15 @@ export default function CameraScreen() {
       )}
 
       {preview && (
-        <Animated.View
-          style={[styles.previewOverlay, { transform: [{ translateY: slideAnim }] }]}
-          {...panResponder.panHandlers}>
-
+        <Animated.View style={[styles.previewOverlay, { transform: [{ translateY: slideAnim }] }]} {...previewPanResponder.panHandlers}>
           {preview.type === 'photo' ? (
-            <RNImage
-              source={{ uri: preview.uri }}
-              style={StyleSheet.absoluteFill}
-              resizeMode="cover"
-            />
+            <RNImage source={{ uri: preview.uri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
           ) : (
             <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' }]}>
               <Text style={{ fontSize: 48 }}>🎥</Text>
               <Text style={{ color: '#fff', opacity: 0.5, fontSize: 13, marginTop: 10 }}>Video ready</Text>
             </View>
           )}
-
           {preview.lens === 'digital' && (
             <>
               <View style={styles.digitalWarm} pointerEvents="none" />
@@ -324,15 +356,20 @@ export default function CameraScreen() {
               <DigitalTimestamp />
             </>
           )}
-
           <TouchableOpacity style={styles.previewClose} onPress={discardPreview}>
             <Text style={styles.previewCloseText}>✕</Text>
           </TouchableOpacity>
-
           <TouchableOpacity style={styles.sendBtn} onPress={sendToCatalog} disabled={uploading}>
             <Text style={styles.sendText}>{uploading ? 'Sending...' : 'Send'}</Text>
           </TouchableOpacity>
+        </Animated.View>
+      )}
 
+      {isMobile && (
+        <Animated.View
+          style={[StyleSheet.absoluteFill, { transform: [{ translateX: catalogSlideAnim }] }]}
+          {...catalogPanResponder.panHandlers}>
+          {showCatalog && <CatalogView onBack={closeCatalog} />}
         </Animated.View>
       )}
     </View>
@@ -345,37 +382,28 @@ const styles = StyleSheet.create({
   permText: { color: '#fff', fontSize: 16, textAlign: 'center', marginBottom: 24 },
   permBtn: { backgroundColor: '#fff', padding: 14, borderRadius: 10, alignItems: 'center', paddingHorizontal: 32 },
   permBtnText: { color: '#000', fontWeight: '600' },
-
   topBar: { position: 'absolute', top: 0, left: 0, right: 0, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 12 },
-
   lensToggle: { flexDirection: 'row', backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 20, overflow: 'hidden', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.2)' },
   lensBtn: { paddingHorizontal: 18, paddingVertical: 8 },
   lensBtnActive: { backgroundColor: 'rgba(255,255,255,0.2)' },
   lensBtnText: { fontSize: 13, color: 'rgba(255,255,255,0.55)', fontWeight: '500' },
   lensBtnTextActive: { color: '#fff' },
-
   flipBtn: { backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 20, width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   flipText: { color: '#fff', fontSize: 18 },
-digitalWarm: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(255,220,120,0.07)' },
-grainOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden' },
-  grainOverlay: { position: 'absolute', inset: 0, overflow: 'hidden' },
-
+  digitalWarm: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(255,220,120,0.07)' },
+  grainOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden' },
   timestamp: { position: 'absolute', bottom: 120, right: 16 },
   timestampText: { color: '#ff3333', fontSize: 13, fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace', fontWeight: '700', textShadowColor: 'rgba(0,0,0,0.8)', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 2 },
-
   recordBar: { position: 'absolute', top: 0, left: 0, right: 0, height: 3, backgroundColor: 'rgba(255,255,255,0.2)' },
   recordFill: { height: 3, backgroundColor: '#ff3333' },
-
   bottomBar: { position: 'absolute', bottom: 48, left: 0, right: 0, alignItems: 'center' },
   captureBtn: { width: 80, height: 80, borderRadius: 40, backgroundColor: 'transparent', borderWidth: 4, borderColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   captureBtnRecording: { borderColor: '#ff3333' },
   captureInner: { width: 60, height: 60, borderRadius: 30, backgroundColor: '#fff' },
   captureInnerRecording: { width: 28, height: 28, borderRadius: 6, backgroundColor: '#ff3333' },
-
-previewOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
+  previewOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   previewClose: { position: 'absolute', top: 10, right: 20, width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center', zIndex: 10 },
   previewCloseText: { color: '#fff', fontSize: 16 },
-
   sendBtn: { position: 'absolute', bottom: 48, right: 32, backgroundColor: '#fff', paddingHorizontal: 28, paddingVertical: 14, borderRadius: 24, zIndex: 10 },
   sendText: { color: '#000', fontWeight: '600', fontSize: 15 },
 })

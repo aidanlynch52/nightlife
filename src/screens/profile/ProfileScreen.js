@@ -9,6 +9,7 @@ import { supabase } from '../../lib/supabase'
 import CreatePostScreen from '../posts/CreatePostScreen'
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window')
+const isMobile = SCREEN_WIDTH < 600
 
 function getPhotoUrl(path) {
   const { data } = supabase.storage.from('Photos').getPublicUrl(path)
@@ -886,24 +887,26 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 12, paddingHorizontal: 16, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: '#ebebeb' },
   leftCol: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  avatar: { width: 70, height: 70, borderRadius: 35, backgroundColor: '#e8e8e8', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#ddd' },
   avatarText: { fontSize: 20, fontWeight: '500', color: '#555' },
-  name: { fontSize: 20, fontWeight: '600', color: '#111' },
-  username: { fontSize: 15, color: '#555', marginTop: 2 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   editPencil: { fontSize: 14, color: '#555' },
-  statsRight: { flexDirection: 'row', gap: 16, alignItems: 'center' },
   statItem: { alignItems: 'center' },
-  statNum: { fontSize: 25, fontWeight: '600', color: '#111' },
-  statLabel: { fontSize: 12, color: '#555', marginTop: 2 },
+  avatar: { width: isMobile ? 52 : 70, height: isMobile ? 52 : 70, borderRadius: isMobile ? 26 : 35, backgroundColor: '#e8e8e8', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#ddd' },
+name: { fontSize: isMobile ? 15 : 20, fontWeight: '600', color: '#111' },
+username: { fontSize: isMobile ? 12 : 15, color: '#555', marginTop: 2 },
+statNum: { fontSize: isMobile ? 18 : 25, fontWeight: '600', color: '#111' },
+statLabel: { fontSize: isMobile ? 10 : 12, color: '#555', marginTop: 2 },
+statsRight: { flexDirection: 'row', gap: isMobile ? 10 : 16, alignItems: 'center' },
+signOutBtn: { position: 'absolute', right: isMobile ? -70 : -95, top: isMobile ? -12 : -18, borderWidth: 1, borderColor: '#e53935', borderRadius: 6, paddingHorizontal: isMobile ? 6 : 8, paddingVertical: 3 },
+signOutText: { color: '#e53935', fontSize: isMobile ? 9 : 11, fontWeight: '500' },
+medalCircle: { width: isMobile ? 60 : 80, height: isMobile ? 60 : 80, borderRadius: isMobile ? 30 : 40, alignItems: 'center', justifyContent: 'center', borderWidth: 2, overflow: 'hidden' },
+medalWrapper: { alignItems: 'center', gap: 4, width: isMobile ? 70 : 90 },
+medalEmoji: { fontSize: isMobile ? 18 : 24 },
   medalsSection: { paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#ebebeb', alignItems: 'center' },
   medalsRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 16 },
-  medalWrapper: { alignItems: 'center', gap: 4, width: 90 },
-  medalCircle: { width: 80, height: 80, borderRadius: 40, alignItems: 'center', justifyContent: 'center', borderWidth: 2, overflow: 'hidden' },
   goldCircle: { borderColor: '#FFD700', backgroundColor: 'rgba(255,215,0,0.08)' },
   silverCircle: { borderColor: '#B8B8B8', backgroundColor: 'rgba(184,184,184,0.08)' },
   bronzeCircle: { borderColor: '#CD7F32', backgroundColor: 'rgba(205,127,50,0.08)' },
-  medalEmoji: { fontSize: 24 },
   medalLabel: { fontSize: 9, color: '#555', fontWeight: '500', letterSpacing: 0.5, textAlign: 'center' },
   tabs: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#ebebeb' },
   tab: { flex: 1, paddingVertical: 11, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
@@ -929,6 +932,4 @@ const styles = StyleSheet.create({
   editCancelText: { color: '#666', fontSize: 14 },
   editSaveBtn: { flex: 1, backgroundColor: '#111', borderRadius: 8, padding: 12, alignItems: 'center' },
   editSaveText: { color: '#fff', fontSize: 14, fontWeight: '600' },
-  signOutBtn: { position: 'absolute', right: -95, top: -18, borderWidth: 1, borderColor: '#e53935', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
-signOutText: { color: '#e53935', fontSize: 11, fontWeight: '500' },
 })
