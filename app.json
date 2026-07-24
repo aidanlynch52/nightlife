@@ -31,10 +31,12 @@
         }
       ]
     },
-    "web": {
-      "bundler": "metro"
-    },
-    "plugins": [
+  "web": {
+  "bundler": "metro",
+  "favicon": "./assets/images/favicon.png",
+  "output": "single"
+},
+      "plugins": [
       "expo-camera",
       "expo-image-picker",
       "expo-media-library",
