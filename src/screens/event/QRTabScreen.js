@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { Alert, Clipboard, Dimensions, Image, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
 import QRCodeLib from 'react-native-qrcode-svg'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../hooks/useAuth'
 import { useSpotify } from '../../hooks/useSpotify'
 import { useNight } from '../../lib/NightContext'
@@ -17,6 +18,8 @@ const MODAL_WIDTH = SCREEN_WIDTH > 600 ? SCREEN_WIDTH * 0.4 : SCREEN_WIDTH * 0.9
 const MODAL_HEIGHT = SCREEN_HEIGHT * 0.7
 
 export default function QRTabScreen() {
+  const { colors } = useTheme()
+  const styles = createStyles(colors)
   const { activeNight, leaveNight } = useNight()
   const { user } = useAuth()
   const { connected, loading: spotifyLoading, connectSpotify } = useSpotify()
@@ -80,41 +83,41 @@ export default function QRTabScreen() {
     setTimeout(() => setCopied(false), 2000)
   }
 
- async function loadAttendees() {
-  const { data } = await supabase
-    .from('event_attendees')
-    .select('user_id, profiles(id, display_name, username, avatar_url)')
-    .eq('event_id', activeNight?.id)
+  async function loadAttendees() {
+    const { data } = await supabase
+      .from('event_attendees')
+      .select('user_id, profiles(id, display_name, username, avatar_url)')
+      .eq('event_id', activeNight?.id)
 
-  const { data: hosts } = await supabase
-    .from('event_hosts')
-    .select('user_id')
-    .eq('event_id', activeNight?.id)
+    const { data: hosts } = await supabase
+      .from('event_hosts')
+      .select('user_id')
+      .eq('event_id', activeNight?.id)
 
-  const { data: auxData } = await supabase
-    .from('aux_assignments')
-    .select('user_id')
-    .eq('event_id', activeNight?.id)
+    const { data: auxData } = await supabase
+      .from('aux_assignments')
+      .select('user_id')
+      .eq('event_id', activeNight?.id)
 
-  const hostIds = new Set((hosts || []).map(h => h.user_id))
-  const auxIds = new Set((auxData || []).map(a => a.user_id))
+    const hostIds = new Set((hosts || []).map(h => h.user_id))
+    const auxIds = new Set((auxData || []).map(a => a.user_id))
 
-  const withRoles = (data || []).map(a => ({
-    ...a,
-    role: hostIds.has(a.user_id) ? 'host' : auxIds.has(a.user_id) ? 'aux' : 'attendee'
-  }))
+    const withRoles = (data || []).map(a => ({
+      ...a,
+      role: hostIds.has(a.user_id) ? 'host' : auxIds.has(a.user_id) ? 'aux' : 'attendee'
+    }))
 
-  const sorted = [
-    ...withRoles.filter(a => a.role === 'host'),
-    ...withRoles.filter(a => a.role === 'aux'),
-    ...withRoles.filter(a => a.role === 'attendee'),
-  ]
+    const sorted = [
+      ...withRoles.filter(a => a.role === 'host'),
+      ...withRoles.filter(a => a.role === 'aux'),
+      ...withRoles.filter(a => a.role === 'attendee'),
+    ]
 
-  setAttendees(sorted)
-  setFilteredAttendees(sorted)
-  setAttendeeSearch('')
-  setShowPeople(true)
-}
+    setAttendees(sorted)
+    setFilteredAttendees(sorted)
+    setAttendeeSearch('')
+    setShowPeople(true)
+  }
 
   async function sendFriendRequest(receiverId) {
     await supabase.from('connection_requests').insert({
@@ -148,7 +151,7 @@ export default function QRTabScreen() {
 
   return (
     <LinearGradient
-      colors={['#f0f0f0', '#ffffff']}
+      colors={colors.backgroundGradient}
       start={{ x: 0, y: 0 }}
       end={{ x: 0, y: 1 }}
       style={{ flex: 1 }}>
@@ -158,7 +161,7 @@ export default function QRTabScreen() {
           <TouchableOpacity style={styles.spotifyBanner} onPress={connectSpotify}>
             <View style={styles.spotifyBannerLeft}>
               <Text style={styles.spotifyBannerTitle}>🎵 Connect Spotify</Text>
-              <Text style={styles.spotifyBannerSub}>You're the Aux — connect Spotify to receive song requests</Text>
+              <Text style={styles.spotifyBannerSub}>You're on Aux!</Text>
             </View>
             <Text style={styles.spotifyBannerArrow}>→</Text>
           </TouchableOpacity>
@@ -173,14 +176,14 @@ export default function QRTabScreen() {
         <View style={styles.header}>
           <Text style={styles.title}>{activeNight?.name}</Text>
           <View style={styles.headerRight}>
-  {SCREEN_WIDTH <= 600 && (
-    <TouchableOpacity style={styles.peopleBtn} onPress={() => router.push('/(tabs)/messages')}>
-      <Text style={styles.peopleBtnText}>💬</Text>
-    </TouchableOpacity>
-  )}
-  <TouchableOpacity style={styles.peopleBtn} onPress={loadAttendees}>
-    <Text style={styles.peopleBtnText}>👥</Text>
-  </TouchableOpacity>
+            {SCREEN_WIDTH <= 600 && (
+              <TouchableOpacity style={styles.peopleBtn} onPress={() => router.push('/(tabs)/messages')}>
+                <Text style={styles.peopleBtnText}>💬</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity style={styles.peopleBtn} onPress={loadAttendees}>
+              <Text style={styles.peopleBtnText}>👥</Text>
+            </TouchableOpacity>
             <TouchableOpacity style={styles.endBtn} onPress={handleEndOrLeave}>
               <Text style={styles.endBtnText}>
                 {activeNight?.role === 'host' || activeNight?.role === 'cohost' ? 'End Event' : 'Leave'}
@@ -224,136 +227,136 @@ export default function QRTabScreen() {
               <TextInput
                 style={styles.searchInput}
                 placeholder="Search by name..."
-                placeholderTextColor="#aaa"
+                placeholderTextColor={colors.textMuted}
                 value={attendeeSearch}
                 onChangeText={setAttendeeSearch}
               />
 
               <ScrollView showsVerticalScrollIndicator={false}>
-{filteredAttendees.map(a => {
-  const profile = a.profiles
-  const roleLabel = a.role === 'host' ? 'Host' : a.role === 'aux' ? 'Aux' : null
-  return (
-    <View key={a.user_id} style={styles.attendeeRow}>
-      <View style={styles.attendeeAvatar}>
-        {profile?.avatar_url ? (
-          <Image source={{ uri: profile.avatar_url }} style={styles.attendeeAvatarImg} />
-        ) : (
-          <Text style={styles.attendeeAvatarText}>
-            {profile?.display_name?.charAt(0) || '?'}
-          </Text>
-        )}
-      </View>
-      <View style={styles.attendeeInfo}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <Text style={styles.attendeeName}>{profile?.display_name}</Text>
-          {roleLabel && (
-            <View style={[styles.roleTag, a.role === 'host' ? styles.roleTagHost : styles.roleTagAux]}>
-              <Text style={styles.roleTagText}>{roleLabel}</Text>
-            </View>
-          )}
-        </View>
-        <Text style={styles.attendeeUsername}>@{profile?.username}</Text>
-      </View>
+                {filteredAttendees.map(a => {
+                  const profile = a.profiles
+                  const roleLabel = a.role === 'host' ? 'Host' : a.role === 'aux' ? 'Aux' : null
+                  return (
+                    <View key={a.user_id} style={styles.attendeeRow}>
+                      <View style={styles.attendeeAvatar}>
+                        {profile?.avatar_url ? (
+                          <Image source={{ uri: profile.avatar_url }} style={styles.attendeeAvatarImg} />
+                        ) : (
+                          <Text style={styles.attendeeAvatarText}>
+                            {profile?.display_name?.charAt(0) || '?'}
+                          </Text>
+                        )}
+                      </View>
+                      <View style={styles.attendeeInfo}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <Text style={styles.attendeeName}>{profile?.display_name}</Text>
+                          {roleLabel && (
+                            <View style={[styles.roleTag, a.role === 'host' ? styles.roleTagHost : styles.roleTagAux]}>
+                              <Text style={styles.roleTagText}>{roleLabel}</Text>
+                            </View>
+                          )}
+                        </View>
+                        <Text style={styles.attendeeUsername}>@{profile?.username}</Text>
+                      </View>
 
-      {a.user_id !== user?.id && (
-        <View style={{ flexDirection: 'row', gap: 4 }}>
-          <TouchableOpacity
-            style={styles.actionBtn}
-            onPress={async () => {
-              setShowPeople(false)
-              const { data: existing } = await supabase
-                .from('conversation_participants')
-                .select('conversation_id')
-                .eq('user_id', user.id)
+                      {a.user_id !== user?.id && (
+                        <View style={{ flexDirection: 'row', gap: 4 }}>
+                          <TouchableOpacity
+                            style={styles.actionBtn}
+                            onPress={async () => {
+                              setShowPeople(false)
+                              const { data: existing } = await supabase
+                                .from('conversation_participants')
+                                .select('conversation_id')
+                                .eq('user_id', user.id)
 
-              let convId = null
-              if (existing?.length) {
-                const convIds = existing.map(e => e.conversation_id)
-                const { data: theirConvos } = await supabase
-                  .from('conversation_participants')
-                  .select('conversation_id')
-                  .eq('user_id', a.user_id)
-                  .in('conversation_id', convIds)
-                if (theirConvos?.length) convId = theirConvos[0].conversation_id
-              }
+                              let convId = null
+                              if (existing?.length) {
+                                const convIds = existing.map(e => e.conversation_id)
+                                const { data: theirConvos } = await supabase
+                                  .from('conversation_participants')
+                                  .select('conversation_id')
+                                  .eq('user_id', a.user_id)
+                                  .in('conversation_id', convIds)
+                                if (theirConvos?.length) convId = theirConvos[0].conversation_id
+                              }
 
-              if (!convId) {
-                const { data: newConvo } = await supabase.from('conversations').insert({}).select().single()
-                convId = newConvo.id
-                await supabase.from('conversation_participants').insert([
-                  { conversation_id: convId, user_id: user.id },
-                  { conversation_id: convId, user_id: a.user_id },
-                ])
-              }
+                              if (!convId) {
+                                const { data: newConvo } = await supabase.from('conversations').insert({}).select().single()
+                                convId = newConvo.id
+                                await supabase.from('conversation_participants').insert([
+                                  { conversation_id: convId, user_id: user.id },
+                                  { conversation_id: convId, user_id: a.user_id },
+                                ])
+                              }
 
-              const { router } = await import('expo-router')
-              router.push({
-                pathname: '/(tabs)/conversation',
-                params: {
-                  conversationId: convId,
-                  otherUserId: a.user_id,
-                  otherUserName: profile?.display_name,
-                  otherUserAvatar: profile?.avatar_url || '',
-                }
-              })
-            }}>
-            <Text style={styles.actionBtnText}>💬</Text>
-          </TouchableOpacity>
+                              const { router } = await import('expo-router')
+                              router.push({
+                                pathname: '/(tabs)/conversation',
+                                params: {
+                                  conversationId: convId,
+                                  otherUserId: a.user_id,
+                                  otherUserName: profile?.display_name,
+                                  otherUserAvatar: profile?.avatar_url || '',
+                                }
+                              })
+                            }}>
+                            <Text style={styles.actionBtnText}>💬</Text>
+                          </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.actionBtn, sentRequests.has(a.user_id) && styles.actionBtnDisabled]}
-            disabled={sentRequests.has(a.user_id)}
-            onPress={() => sendFriendRequest(a.user_id)}>
-            <Text style={styles.actionBtnText}>
-              {sentRequests.has(a.user_id) ? 'Pending' : 'Add'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      )}
+                          <TouchableOpacity
+                            style={[styles.actionBtn, sentRequests.has(a.user_id) && styles.actionBtnDisabled]}
+                            disabled={sentRequests.has(a.user_id)}
+                            onPress={() => sendFriendRequest(a.user_id)}>
+                            <Text style={styles.actionBtnText}>
+                              {sentRequests.has(a.user_id) ? 'Pending' : 'Add'}
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+                      )}
 
-      {isOriginalHost && a.user_id !== user?.id && (
-        <View style={styles.attendeeActions}>
-          <TouchableOpacity
-            style={styles.actionBtn}
-            onPress={async () => {
-              await supabase.from('event_hosts').insert({ event_id: activeNight.id, user_id: a.user_id })
-            }}>
-            <Text style={styles.actionBtnText}>Host</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.actionBtn}
-            onPress={async () => {
-              await supabase.from('aux_assignments').insert({ event_id: activeNight.id, user_id: a.user_id })
-            }}>
-            <Text style={styles.actionBtnText}>Aux</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.actionBtn, styles.actionBtnRed]}
-            onPress={() => {
-              Alert.alert('Remove member?', `Remove ${profile?.display_name} from the night?`, [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                  text: 'Remove', style: 'destructive',
-                  onPress: async () => {
-                    await supabase.from('event_attendees')
-                      .delete()
-                      .eq('event_id', activeNight.id)
-                      .eq('user_id', a.user_id)
-                    setAttendees(attendees.filter(x => x.user_id !== a.user_id))
-                  }
-                }
-              ])
-            }}>
-            <Text style={[styles.actionBtnText, { color: '#cc0000' }]}>Remove</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-    </View>
-  )
-})}
+                      {isOriginalHost && a.user_id !== user?.id && (
+                        <View style={styles.attendeeActions}>
+                          <TouchableOpacity
+                            style={styles.actionBtn}
+                            onPress={async () => {
+                              await supabase.from('event_hosts').insert({ event_id: activeNight.id, user_id: a.user_id })
+                            }}>
+                            <Text style={styles.actionBtnText}>Host</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={styles.actionBtn}
+                            onPress={async () => {
+                              await supabase.from('aux_assignments').insert({ event_id: activeNight.id, user_id: a.user_id })
+                            }}>
+                            <Text style={styles.actionBtnText}>Aux</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[styles.actionBtn, styles.actionBtnRed]}
+                            onPress={() => {
+                              Alert.alert('Remove member?', `Remove ${profile?.display_name} from the night?`, [
+                                { text: 'Cancel', style: 'cancel' },
+                                {
+                                  text: 'Remove', style: 'destructive',
+                                  onPress: async () => {
+                                    await supabase.from('event_attendees')
+                                      .delete()
+                                      .eq('event_id', activeNight.id)
+                                      .eq('user_id', a.user_id)
+                                    setAttendees(attendees.filter(x => x.user_id !== a.user_id))
+                                  }
+                                }
+                              ])
+                            }}>
+                            <Text style={[styles.actionBtnText, { color: colors.danger }]}>Remove</Text>
+                          </TouchableOpacity>
+                        </View>
+                      )}
+                    </View>
+                  )
+                })}
                 {filteredAttendees.length === 0 && (
-                  <Text style={{ color: '#aaa', textAlign: 'center', padding: 20, fontSize: 13 }}>No results</Text>
+                  <Text style={{ color: colors.textMuted, textAlign: 'center', padding: 20, fontSize: 13 }}>No results</Text>
                 )}
               </ScrollView>
             </View>
@@ -365,49 +368,53 @@ export default function QRTabScreen() {
   )
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, padding: 24 },
-  spotifyBanner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'rgba(30,215,96,0.08)', borderWidth: 1, borderColor: 'rgba(30,215,96,0.4)', borderRadius: 12, padding: 14, marginBottom: 16 },
-  spotifyBannerLeft: { flex: 1 },
-  spotifyBannerTitle: { fontSize: 14, fontWeight: '600', color: '#1aa34a', marginBottom: 2 },
-  spotifyBannerSub: { fontSize: 11, color: '#555' },
-  spotifyBannerArrow: { fontSize: 18, color: '#1aa34a', marginLeft: 8 },
-  spotifyConnected: { backgroundColor: 'rgba(30,215,96,0.08)', borderWidth: 1, borderColor: 'rgba(30,215,96,0.3)', borderRadius: 10, padding: 10, marginBottom: 12, alignItems: 'center' },
-  spotifyConnectedText: { fontSize: 12, color: '#1aa34a' },
-  header: { alignItems: 'center', marginBottom: 32, position: 'relative' },
-  title: { fontSize: SCREEN_WIDTH > 600 ? 28 : 0, fontWeight: '700', color: '#111', textAlign: 'center', height: SCREEN_WIDTH > 600 ? 'auto' : 0 },
-  headerRight: { position: 'absolute', right: 0, top: 0, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  peopleBtn: { borderWidth: 1.5, borderColor: '#888', borderRadius: 8, paddingHorizontal: SCREEN_WIDTH > 600 ? 10 : 7, paddingVertical: SCREEN_WIDTH > 600 ? 7 : 4, backgroundColor: '#fff', justifyContent: 'center' },
-  peopleBtnText: { fontSize: SCREEN_WIDTH > 600 ? 16 : 13 },
-endBtn: { borderWidth: 1.5, borderColor: '#cc0000', borderRadius: 8, paddingHorizontal: SCREEN_WIDTH > 600 ? 14 : 8, paddingVertical: SCREEN_WIDTH > 600 ? 7 : 4, backgroundColor: '#fff', justifyContent: 'center' },
-endBtnText: { color: '#cc0000', fontSize: SCREEN_WIDTH > 600 ? 13 : 11, fontWeight: '500' },
-  qrSection: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 20 },
-  qrBox: { backgroundColor: '#fff', padding: 20, borderRadius: 16, borderWidth: 1, borderColor: '#ddd' },
-  hint: { fontSize: 13, color: '#888', textAlign: 'center' },
-  buttons: { flexDirection: 'row', justifyContent: 'center', gap: 12, paddingBottom: 20 },
-  btnPrimary: { backgroundColor: '#fff', borderWidth: 2, borderColor: '#111', paddingVertical: 10, paddingHorizontal: 24, borderRadius: 20, alignItems: 'center' },
-  btnPrimaryText: { color: '#111', fontSize: 14, fontWeight: '600' },
-  modalBackdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.4)' },
-  modalCenter: { position: 'absolute', top: '50%', left: '50%', transform: [{ translateX: -(MODAL_WIDTH / 2) }, { translateY: -(MODAL_HEIGHT / 2) }], width: MODAL_WIDTH, height: MODAL_HEIGHT },
-  modalSheet: { flex: 1, backgroundColor: '#fff', borderRadius: 20, padding: 20, borderWidth: 1, borderColor: '#ddd', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 12 },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  modalTitle: { fontSize: 18, fontWeight: '600', color: '#111' },
-  modalClose: { fontSize: 18, color: '#999' },
-  searchInput: { borderWidth: 1, borderColor: '#ddd', borderRadius: 10, padding: 9, fontSize: 13, color: '#111', backgroundColor: '#f9f9f9', marginBottom: 12 },
-  attendeeRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#f0f0f0', gap: 8 },
-  attendeeInfo: { flex: 1 },
-  attendeeName: { fontSize: 13, fontWeight: '500', color: '#111' },
-  attendeeUsername: { fontSize: 11, color: '#888' },
-  attendeeActions: { flexDirection: 'row', gap: 4 },
-  actionBtn: { borderWidth: 1, borderColor: '#ddd', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3, backgroundColor: '#fff' },
-  actionBtnDisabled: { opacity: 0.4 },
-  actionBtnRed: { borderColor: 'rgba(200,0,0,0.3)' },
-  actionBtnText: { fontSize: 10, color: '#333' },
-  attendeeAvatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#f0f0f0', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#ddd' },
-  attendeeAvatarImg: { width: 32, height: 32, borderRadius: 16 },
-  attendeeAvatarText: { fontSize: 13, fontWeight: '600', color: '#555' },
-roleTag: { borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1 },
-roleTagHost: { backgroundColor: 'rgba(0,0,0,0.08)' },
-roleTagAux: { backgroundColor: 'rgba(30,215,96,0.12)' },
-roleTagText: { fontSize: 9, fontWeight: '600', color: '#555', textTransform: 'uppercase', letterSpacing: 0.4 },
-})
+function createStyles(colors) {
+  return StyleSheet.create({
+    container: { flex: 1, padding: 24 },
+    spotifyBanner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'rgba(30,215,96,0.08)', borderWidth: 1, borderColor: 'rgba(30,215,96,0.4)', borderRadius: 12, padding: 14, marginBottom: 16 },
+    spotifyBannerLeft: { flex: 1 },
+    spotifyBannerTitle: { fontSize: 14, fontWeight: '600', color: '#1aa34a', marginBottom: 2 },
+    spotifyBannerSub: { fontSize: 11, color: colors.textSecondary },
+    spotifyBannerArrow: { fontSize: 18, color: '#1aa34a', marginLeft: 8 },
+    spotifyConnected: { backgroundColor: 'rgba(30,215,96,0.08)', borderWidth: 1, borderColor: 'rgba(30,215,96,0.3)', borderRadius: 10, padding: 10, marginBottom: 12, alignItems: 'center' },
+    spotifyConnectedText: { fontSize: 12, color: '#1aa34a' },
+    header: { alignItems: 'center', marginBottom: 32, position: 'relative' },
+    title: { fontSize: SCREEN_WIDTH > 600 ? 28 : 0, fontWeight: '700', color: colors.text, textAlign: 'center', height: SCREEN_WIDTH > 600 ? 'auto' : 0 },
+    headerRight: { position: 'absolute', right: 0, top: 0, flexDirection: 'row', alignItems: 'center', gap: 8 },
+    peopleBtn: { borderWidth: 1.5, borderColor: colors.borderStrong, borderRadius: 8, paddingHorizontal: SCREEN_WIDTH > 600 ? 10 : 7, paddingVertical: SCREEN_WIDTH > 600 ? 7 : 4, backgroundColor: colors.cardBackground, justifyContent: 'center' },
+    peopleBtnText: { fontSize: SCREEN_WIDTH > 600 ? 16 : 13 },
+    endBtn: { borderWidth: 1.5, borderColor: colors.danger, borderRadius: 8, paddingHorizontal: SCREEN_WIDTH > 600 ? 14 : 8, paddingVertical: SCREEN_WIDTH > 600 ? 7 : 4, backgroundColor: colors.cardBackground, justifyContent: 'center' },
+    endBtnText: { color: colors.danger, fontSize: SCREEN_WIDTH > 600 ? 13 : 11, fontWeight: '500' },
+    qrSection: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 20 },
+    // Fixed white/black regardless of theme — QR scanners rely on
+    // high-contrast black-on-white for reliable scanning.
+    qrBox: { backgroundColor: '#fff', padding: 20, borderRadius: 16, borderWidth: 1, borderColor: '#ddd' },
+    hint: { fontSize: 13, color: colors.textMuted, textAlign: 'center' },
+    buttons: { flexDirection: 'row', justifyContent: 'center', gap: 12, paddingBottom: 20 },
+    btnPrimary: { backgroundColor: colors.cardBackground, borderWidth: 2, borderColor: colors.text, paddingVertical: 10, paddingHorizontal: 24, borderRadius: 20, alignItems: 'center' },
+    btnPrimaryText: { color: colors.text, fontSize: 14, fontWeight: '600' },
+    modalBackdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.4)' },
+    modalCenter: { position: 'absolute', top: '50%', left: '50%', transform: [{ translateX: -(MODAL_WIDTH / 2) }, { translateY: -(MODAL_HEIGHT / 2) }], width: MODAL_WIDTH, height: MODAL_HEIGHT },
+    modalSheet: { flex: 1, backgroundColor: colors.cardBackground, borderRadius: 20, padding: 20, borderWidth: 1, borderColor: colors.borderStrong, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 12 },
+    modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+    modalTitle: { fontSize: 18, fontWeight: '600', color: colors.text },
+    modalClose: { fontSize: 18, color: colors.textMuted },
+    searchInput: { borderWidth: 1, borderColor: colors.border, borderRadius: 10, padding: 9, fontSize: 13, color: colors.text, backgroundColor: colors.inputBackground, marginBottom: 12 },
+    attendeeRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border, gap: 8 },
+    attendeeInfo: { flex: 1 },
+    attendeeName: { fontSize: 13, fontWeight: '500', color: colors.text },
+    attendeeUsername: { fontSize: 11, color: colors.textMuted },
+    attendeeActions: { flexDirection: 'row', gap: 4 },
+    actionBtn: { borderWidth: 1, borderColor: colors.border, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3, backgroundColor: colors.cardBackground },
+    actionBtnDisabled: { opacity: 0.4 },
+    actionBtnRed: { borderColor: 'rgba(200,0,0,0.3)' },
+    actionBtnText: { fontSize: 10, color: colors.text },
+    attendeeAvatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.inputBackground, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border },
+    attendeeAvatarImg: { width: 32, height: 32, borderRadius: 16 },
+    attendeeAvatarText: { fontSize: 13, fontWeight: '600', color: colors.textSecondary },
+    roleTag: { borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1 },
+    roleTagHost: { backgroundColor: colors.inputBackground },
+    roleTagAux: { backgroundColor: 'rgba(30,215,96,0.12)' },
+    roleTagText: { fontSize: 9, fontWeight: '600', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.4 },
+  })
+}

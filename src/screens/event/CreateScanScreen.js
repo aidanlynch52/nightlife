@@ -1,14 +1,18 @@
 import { CameraView, useCameraPermissions } from 'expo-camera'
 import { LinearGradient } from 'expo-linear-gradient'
+import * as Location from 'expo-location'
 import { router, useIsFocused } from 'expo-router'
 import { useEffect, useState } from 'react'
 import { Clipboard, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { useTheme } from '../../contexts/ThemeContext'
 import { useEvent } from '../../hooks/useEvent'
 import { useNight } from '../../lib/NightContext'
 import { supabase } from '../../lib/supabase'
 
 export default function CreateScanScreen() {
+  const { colors } = useTheme()
+  const styles = createStyles(colors)
   const [mode, setMode] = useState('default')
   const [name, setName] = useState('')
   const [duration, setDuration] = useState('6')
@@ -24,6 +28,7 @@ export default function CreateScanScreen() {
   const [geoEnabled, setGeoEnabled] = useState(false)
   const [copied, setCopied] = useState(null)
   const [scanned, setScanned] = useState(false)
+  const [scanError, setScanError] = useState('')
   const [cameraPermission, requestCameraPermission] = useCameraPermissions()
   const { createEvent } = useEvent()
   const { joinNight } = useNight()
@@ -34,7 +39,7 @@ export default function CreateScanScreen() {
   }, [])
 
   useEffect(() => {
-    if (mode === 'default') setScanned(false)
+    if (mode === 'default') { setScanned(false); setScanError('') }
   }, [mode])
 
   useEffect(() => {
@@ -50,6 +55,7 @@ export default function CreateScanScreen() {
   async function handleBarcodeScanned({ data }) {
     if (scanned) return
     setScanned(true)
+    setScanError('')
     try {
       const { data: eventData, error } = await supabase
         .from('events')
@@ -59,15 +65,42 @@ export default function CreateScanScreen() {
         .single()
       if (error || !eventData) {
         setScanned(false)
+        setScanError('This QR code is invalid or the night has ended')
         return
       }
+
       const { data: { user } } = await supabase.auth.getUser()
-      await supabase.from('event_attendees').insert({ event_id: eventData.id, user_id: user.id }).single()
+
+      let lat = null
+      let lng = null
+      if (eventData.geo_enabled) {
+        const { status } = await Location.requestForegroundPermissionsAsync()
+        if (status === 'granted') {
+          const loc = await Location.getCurrentPositionAsync({})
+          lat = loc.coords.latitude
+          lng = loc.coords.longitude
+        }
+      }
+
+      const { data: rpcResult, error: rpcError } = await supabase.rpc('join_event_with_geo_check', {
+        p_event_id: eventData.id,
+        p_user_id: user.id,
+        p_lat: lat,
+        p_lng: lng,
+      })
+
+      if (rpcError || !rpcResult?.success) {
+        setScanned(false)
+        setScanError(rpcResult?.error || 'Could not join this night, try again')
+        return
+      }
+
       joinNight({ id: eventData.id, name: eventData.name, qrToken: eventData.qr_code_token, role: 'attendee' })
       router.replace('/(tabs)/home')
     } catch (e) {
       console.error('Scan error:', e)
       setScanned(false)
+      setScanError('Something went wrong, try again')
     }
   }
 
@@ -92,20 +125,51 @@ export default function CreateScanScreen() {
     if (!name.trim()) { setError('Give your night a name'); return }
     setLoading(true)
     setError('')
+
+    let hostLat = null
+    let hostLng = null
+    if (geoEnabled) {
+      const { status } = await Location.requestForegroundPermissionsAsync()
+      if (status !== 'granted') {
+        setLoading(false)
+        setError('Location permission is needed to enable the geography check')
+        return
+      }
+      try {
+        const loc = await Location.getCurrentPositionAsync({})
+        hostLat = loc.coords.latitude
+        hostLng = loc.coords.longitude
+      } catch (e) {
+        setLoading(false)
+        setError('Could not get your current location, try again')
+        return
+      }
+    }
+
     const hours = parseFloat(duration)
     const closeDate = new Date()
     closeDate.setMinutes(closeDate.getMinutes() + Math.round((isNaN(hours) ? 6 : hours) * 60))
     const autoCloseAt = closeDate.toISOString()
     const { data, error } = await createEvent(name.trim(), autoCloseAt, null)
-    setLoading(false)
-    if (error) { console.error('Create event error:', JSON.stringify(error)); setError(error.message || 'Something went wrong, try again'); return }
-    if (!data?.id) { setError('The night could not be created. Please try again.'); return }
+
+    if (error) { setLoading(false); console.error('Create event error:', JSON.stringify(error)); setError(error.message || 'Something went wrong, try again'); return }
+    if (!data?.id) { setLoading(false); setError('The night could not be created. Please try again.'); return }
+
+    if (geoEnabled) {
+      await supabase.from('events').update({
+        geo_enabled: true,
+        host_lat: hostLat,
+        host_lng: hostLng,
+      }).eq('id', data.id)
+    }
+
     for (const cohost of cohosts) {
       await supabase.from('event_hosts').insert({ event_id: data.id, user_id: cohost.id })
     }
     if (aux) {
       await supabase.from('aux_assignments').insert({ event_id: data.id, user_id: aux.id })
     }
+    setLoading(false)
     router.push({ pathname: '/(event)/qr-display', params: { eventId: data.id, eventName: data.name, qrToken: data.qr_code_token } })
   }
 
@@ -119,7 +183,7 @@ export default function CreateScanScreen() {
 
   if (mode === 'create') {
     return (
-      <LinearGradient colors={['#000005', '#000510', '#001030', '#002060']} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} style={{ flex: 1 }}>
+      <LinearGradient colors={colors.backgroundGradient} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} style={{ flex: 1 }}>
         <SafeAreaView style={styles.container}>
           <ScrollView>
             <View style={styles.header}>
@@ -130,10 +194,10 @@ export default function CreateScanScreen() {
             </View>
             <View style={styles.form}>
               <Text style={styles.label}>Night name</Text>
-              <TextInput style={styles.input} placeholder="e.g. Tommy's Rager" placeholderTextColor="rgba(255,255,255,0.3)" value={name} onChangeText={setName} />
+              <TextInput style={styles.input} placeholder="e.g. Tommy's Rager" placeholderTextColor={colors.textMuted} value={name} onChangeText={setName} />
               <Text style={styles.label}>How many hours until auto-close?</Text>
               <Text style={styles.sublabel}>You can also end the night manually at any time.</Text>
-              <TextInput style={styles.input} placeholder="e.g. 6 or 6.25" placeholderTextColor="rgba(255,255,255,0.3)" value={duration} onChangeText={setDuration} keyboardType="decimal-pad" />
+              <TextInput style={styles.input} placeholder="e.g. 6 or 6.25" placeholderTextColor={colors.textMuted} value={duration} onChangeText={setDuration} keyboardType="decimal-pad" />
               {closeTime ? <View style={styles.closeTimeBox}><Text style={styles.closeTimeText}>{closeTime}</Text></View> : null}
 
               <View style={styles.sectionHeader}>
@@ -143,7 +207,7 @@ export default function CreateScanScreen() {
                 </View>
                 <InviteButtons role="host" />
               </View>
-              <TextInput style={styles.input} placeholder="Search by name" placeholderTextColor="rgba(255,255,255,0.3)" value={cohostSearch} onChangeText={(t) => { setCohostSearch(t); searchUsers(t, setCohostResults) }} />
+              <TextInput style={styles.input} placeholder="Search by name" placeholderTextColor={colors.textMuted} value={cohostSearch} onChangeText={(t) => { setCohostSearch(t); searchUsers(t, setCohostResults) }} />
               {cohostResults.map(u => (
                 <TouchableOpacity key={u.id} style={styles.resultRow} onPress={() => { if (!cohosts.find(c => c.id === u.id)) setCohosts([...cohosts, u]); setCohostSearch(''); setCohostResults([]) }}>
                   <Text style={styles.resultName}>{u.display_name}</Text>
@@ -166,7 +230,7 @@ export default function CreateScanScreen() {
                 </View>
                 <InviteButtons role="aux" />
               </View>
-              <TextInput style={styles.input} placeholder="Search by name" placeholderTextColor="rgba(255,255,255,0.3)" value={auxSearch} onChangeText={(t) => { setAuxSearch(t); searchUsers(t, setAuxResults) }} />
+              <TextInput style={styles.input} placeholder="Search by name" placeholderTextColor={colors.textMuted} value={auxSearch} onChangeText={(t) => { setAuxSearch(t); searchUsers(t, setAuxResults) }} />
               {auxResults.map(u => (
                 <TouchableOpacity key={u.id} style={styles.resultRow} onPress={() => { setAux(u); setAuxSearch(''); setAuxResults([]) }}>
                   <Text style={styles.resultName}>{u.display_name}</Text>
@@ -185,9 +249,9 @@ export default function CreateScanScreen() {
               <View style={styles.geoRow}>
                 <View style={styles.geoLeft}>
                   <Text style={styles.label}>Geography check</Text>
-                  <Text style={styles.sublabel}>Only let people join within 100m of the party.</Text>
+                  <Text style={styles.sublabel}>Only let people join within 500m of the party.</Text>
                 </View>
-                <Switch value={geoEnabled} onValueChange={setGeoEnabled} thumbColor="#fff" trackColor={{ false: 'rgba(255,255,255,0.2)', true: '#4a90e2' }} />
+                <Switch value={geoEnabled} onValueChange={setGeoEnabled} thumbColor="#fff" trackColor={{ false: colors.border, true: '#4a90e2' }} />
               </View>
               {geoEnabled && <View style={styles.closeTimeBox}><Text style={styles.closeTimeText}>Location will be set from your current position when you create the night.</Text></View>}
 
@@ -204,7 +268,7 @@ export default function CreateScanScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={styles.scanContainer}>
       {isFocused && cameraPermission?.granted && (
         <CameraView
           style={StyleSheet.absoluteFill}
@@ -232,56 +296,61 @@ export default function CreateScanScreen() {
           <View style={styles.scanCornerBR} />
         </View>
         <Text style={styles.scanText}>
-          {scanned ? 'Joining night...' : 'Point at a QR code to join a night'}
+          {scanError ? scanError : scanned ? 'Joining night...' : 'Point at a QR code to join a night'}
         </Text>
       </View>
 
       <View style={styles.bottom}>
-        <TouchableOpacity style={styles.btnPrimary} onPress={() => setMode('create')}>
-          <Text style={styles.btnPrimaryText}>+ Create a night</Text>
+        <TouchableOpacity style={styles.scanBtnPrimary} onPress={() => setMode('create')}>
+          <Text style={styles.scanBtnPrimaryText}>+ Create a night</Text>
         </TouchableOpacity>
       </View>
     </View>
   )
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000' },
-  scanOverlay: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  scanViewfinder: { width: 220, height: 220, borderRadius: 12, position: 'relative', marginBottom: 20 },
-  scanCornerTL: { position: 'absolute', top: 0, left: 0, width: 28, height: 28, borderTopWidth: 3, borderLeftWidth: 3, borderColor: '#fff', borderTopLeftRadius: 8 },
-  scanCornerTR: { position: 'absolute', top: 0, right: 0, width: 28, height: 28, borderTopWidth: 3, borderRightWidth: 3, borderColor: '#fff', borderTopRightRadius: 8 },
-  scanCornerBL: { position: 'absolute', bottom: 0, left: 0, width: 28, height: 28, borderBottomWidth: 3, borderLeftWidth: 3, borderColor: '#fff', borderBottomLeftRadius: 8 },
-  scanCornerBR: { position: 'absolute', bottom: 0, right: 0, width: 28, height: 28, borderBottomWidth: 3, borderRightWidth: 3, borderColor: '#fff', borderBottomRightRadius: 8 },
-  scanText: { fontSize: 14, color: 'rgba(255,255,255,0.7)', textAlign: 'center' },
-  bottom: { padding: 24, paddingBottom: 32 },
-  noCamera: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
-  noCameraText: { color: '#fff', fontSize: 14, textAlign: 'center', marginBottom: 20, opacity: 0.6 },
-  permBtn: { backgroundColor: '#fff', padding: 14, borderRadius: 10, paddingHorizontal: 32 },
-  permBtnText: { color: '#000', fontWeight: '600' },
-  header: { padding: 12, paddingTop: 8, borderBottomWidth: 0.5, borderBottomColor: 'rgba(255,255,255,0.1)' },
-  back: { fontSize: 14, color: 'rgba(255,255,255,0.5)', marginBottom: 6 },
-  title: { fontSize: 22, fontWeight: '600', color: '#fff' },
-  form: { padding: 16 },
-  label: { fontSize: 13, fontWeight: '500', marginBottom: 2, color: '#fff', marginTop: 14 },
-  sublabel: { fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 6 },
-  input: { borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.2)', borderRadius: 8, padding: 10, fontSize: 14, marginBottom: 6, color: '#fff', backgroundColor: 'rgba(255,255,255,0.07)' },
-  closeTimeBox: { backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 8, padding: 10, marginBottom: 10 },
-  closeTimeText: { fontSize: 12, color: 'rgba(255,255,255,0.6)', lineHeight: 18 },
-  resultRow: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 10, borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.15)', borderRadius: 8, marginBottom: 4, backgroundColor: 'rgba(255,255,255,0.05)' },
-  resultName: { fontSize: 13, fontWeight: '500', color: '#fff' },
-  resultUsername: { fontSize: 11, color: 'rgba(255,255,255,0.4)' },
-  addedRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 10, backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 8, marginBottom: 4, marginTop: 4, borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.15)' },
-  addedName: { fontSize: 13, fontWeight: '500', color: '#fff' },
-  removeBtn: { fontSize: 12, color: '#ff6b6b' },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 14, marginBottom: 4 },
-  sectionText: { flex: 1, marginRight: 12 },
-  sectionLabel: { marginTop: 0 },
-  invitePill: { alignSelf: 'flex-end', backgroundColor: 'rgba(100,180,255,0.15)', borderRadius: 999, paddingHorizontal: 18, paddingVertical: 9, borderWidth: 0.5, borderColor: 'rgba(100,180,255,0.35)' },
-  inviteText: { fontSize: 13, color: 'rgba(140,210,255,0.95)', fontWeight: '500' },
-  geoRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 14, paddingVertical: 4 },
-  geoLeft: { flex: 1, marginRight: 16 },
-  error: { color: '#ff6b6b', fontSize: 13, marginBottom: 12, marginTop: 8 },
-  btnPrimary: { backgroundColor: '#fff', padding: 14, borderRadius: 10, alignItems: 'center', marginTop: 20, marginBottom: 40 },
-  btnPrimaryText: { color: '#000', fontSize: 15, fontWeight: '600' },
-})
+function createStyles(colors) {
+  return StyleSheet.create({
+    container: { flex: 1 },
+    scanContainer: { flex: 1, backgroundColor: '#000' },
+    scanOverlay: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+    scanViewfinder: { width: 220, height: 220, borderRadius: 12, position: 'relative', marginBottom: 20 },
+    scanCornerTL: { position: 'absolute', top: 0, left: 0, width: 28, height: 28, borderTopWidth: 3, borderLeftWidth: 3, borderColor: '#fff', borderTopLeftRadius: 8 },
+    scanCornerTR: { position: 'absolute', top: 0, right: 0, width: 28, height: 28, borderTopWidth: 3, borderRightWidth: 3, borderColor: '#fff', borderTopRightRadius: 8 },
+    scanCornerBL: { position: 'absolute', bottom: 0, left: 0, width: 28, height: 28, borderBottomWidth: 3, borderLeftWidth: 3, borderColor: '#fff', borderBottomLeftRadius: 8 },
+    scanCornerBR: { position: 'absolute', bottom: 0, right: 0, width: 28, height: 28, borderBottomWidth: 3, borderRightWidth: 3, borderColor: '#fff', borderBottomRightRadius: 8 },
+    scanText: { fontSize: 14, color: 'rgba(255,255,255,0.7)', textAlign: 'center', paddingHorizontal: 24 },
+    bottom: { padding: 24, paddingBottom: 32 },
+    noCamera: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
+    noCameraText: { color: '#fff', fontSize: 14, textAlign: 'center', marginBottom: 20, opacity: 0.6 },
+    permBtn: { backgroundColor: '#fff', padding: 14, borderRadius: 10, paddingHorizontal: 32 },
+    permBtnText: { color: '#000', fontWeight: '600' },
+    scanBtnPrimary: { backgroundColor: '#fff', padding: 14, borderRadius: 10, alignItems: 'center' },
+    scanBtnPrimaryText: { color: '#000', fontSize: 15, fontWeight: '600' },
+    header: { padding: 12, paddingTop: 8, borderBottomWidth: 0.5, borderBottomColor: colors.border },
+    back: { fontSize: 14, color: colors.textSecondary, marginBottom: 6 },
+    title: { fontSize: 22, fontWeight: '600', color: colors.text },
+    form: { padding: 16 },
+    label: { fontSize: 13, fontWeight: '500', marginBottom: 2, color: colors.text, marginTop: 14 },
+    sublabel: { fontSize: 11, color: colors.textMuted, marginBottom: 6 },
+    input: { borderWidth: 0.5, borderColor: colors.border, borderRadius: 8, padding: 10, fontSize: 14, marginBottom: 6, color: colors.text, backgroundColor: colors.inputBackground },
+    closeTimeBox: { backgroundColor: colors.inputBackground, borderRadius: 8, padding: 10, marginBottom: 10 },
+    closeTimeText: { fontSize: 12, color: colors.textSecondary, lineHeight: 18 },
+    resultRow: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 10, borderWidth: 0.5, borderColor: colors.border, borderRadius: 8, marginBottom: 4, backgroundColor: colors.inputBackground },
+    resultName: { fontSize: 13, fontWeight: '500', color: colors.text },
+    resultUsername: { fontSize: 11, color: colors.textMuted },
+    addedRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 10, backgroundColor: colors.inputBackground, borderRadius: 8, marginBottom: 4, marginTop: 4, borderWidth: 0.5, borderColor: colors.border },
+    addedName: { fontSize: 13, fontWeight: '500', color: colors.text },
+    removeBtn: { fontSize: 12, color: '#ff6b6b' },
+    sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 14, marginBottom: 4 },
+    sectionText: { flex: 1, marginRight: 12 },
+    sectionLabel: { marginTop: 0 },
+    invitePill: { alignSelf: 'flex-end', backgroundColor: 'rgba(100,180,255,0.15)', borderRadius: 999, paddingHorizontal: 18, paddingVertical: 9, borderWidth: 0.5, borderColor: 'rgba(100,180,255,0.35)' },
+    inviteText: { fontSize: 13, color: 'rgba(140,210,255,0.95)', fontWeight: '500' },
+    geoRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 14, paddingVertical: 4 },
+    geoLeft: { flex: 1, marginRight: 16 },
+    error: { color: '#ff6b6b', fontSize: 13, marginBottom: 12, marginTop: 8 },
+    btnPrimary: { backgroundColor: colors.buttonPrimary, padding: 14, borderRadius: 10, alignItems: 'center', marginTop: 20, marginBottom: 40 },
+    btnPrimaryText: { color: colors.buttonPrimaryText, fontSize: 15, fontWeight: '600' },
+  })
+}

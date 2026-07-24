@@ -16,12 +16,16 @@ const lightColors = {
   inputBackground: '#f9f9f9',
   tabBarBackground: '#ffffff',
   danger: '#cc0000',
+  buttonPrimary: '#111111',
+buttonPrimaryText: '#ffffff',
+buttonSecondary: '#f0f0f0',
+buttonSecondaryText: '#111111',
 }
 
 const darkColors = {
   mode: 'dark',
   background: '#000510',
-  backgroundGradient: ['#000005', '#000510', '#001030', '#002060'],
+  backgroundGradient: ['#000000', '#000000'],
   cardBackground: '#0a1428',
   text: '#ffffff',
   textSecondary: 'rgba(255,255,255,0.6)',
@@ -31,6 +35,8 @@ const darkColors = {
   inputBackground: 'rgba(255,255,255,0.08)',
   tabBarBackground: '#000510',
   danger: '#ff4444',
+  buttonPrimary: '#ffffff',
+  buttonPrimaryText: '#000000',
 }
 
 const ThemeContext = createContext({

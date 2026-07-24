@@ -4,11 +4,14 @@ import { useEffect, useState } from 'react'
 import { Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import QRCode from 'react-native-qrcode-svg'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../hooks/useAuth'
 import { useNight } from '../../lib/NightContext'
 import { supabase } from '../../lib/supabase'
 
 export default function QRDisplayScreen() {
+  const { colors } = useTheme()
+  const styles = createStyles(colors)
   const { eventId, eventName, qrToken } = useLocalSearchParams()
   const [sharing, setSharing] = useState(false)
   const { user } = useAuth()
@@ -38,7 +41,7 @@ export default function QRDisplayScreen() {
 
   return (
     <LinearGradient
-      colors={['#000005', '#000510', '#001030', '#002060']}
+      colors={colors.backgroundGradient}
       start={{ x: 0, y: 0 }}
       end={{ x: 0, y: 1 }}
       style={{ flex: 1 }}>
@@ -71,16 +74,20 @@ export default function QRDisplayScreen() {
   )
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, padding: 24 },
-  header: { marginBottom: 32 },
-  back: { fontSize: 14, color: 'rgba(255,255,255,0.5)', marginBottom: 16 },
-  title: { fontSize: 26, fontWeight: '700', color: '#fff', marginBottom: 6 },
-  subtitle: { fontSize: 13, color: 'rgba(255,255,255,0.4)' },
-  qrSection: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 20 },
-  qrBox: { backgroundColor: '#fff', padding: 20, borderRadius: 16 },
-  tokenText: { fontSize: 11, color: 'rgba(255,255,255,0.3)', letterSpacing: 1 },
-  buttons: { gap: 12, paddingBottom: 20 },
-  btnPrimary: { backgroundColor: '#fff', padding: 16, borderRadius: 12, alignItems: 'center' },
-  btnPrimaryText: { color: '#000', fontSize: 16, fontWeight: '600' },
-})
+function createStyles(colors) {
+  return StyleSheet.create({
+    container: { flex: 1, padding: 24 },
+    header: { marginBottom: 32 },
+    back: { fontSize: 14, color: colors.textSecondary, marginBottom: 16 },
+    title: { fontSize: 26, fontWeight: '700', color: colors.text, marginBottom: 6 },
+    subtitle: { fontSize: 13, color: colors.textMuted },
+    qrSection: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 20 },
+    // Kept fixed white/black regardless of theme — QR scanners rely on
+    // high-contrast black-on-white and inverting it risks scan reliability.
+    qrBox: { backgroundColor: '#fff', padding: 20, borderRadius: 16 },
+    tokenText: { fontSize: 11, color: colors.textMuted, letterSpacing: 1 },
+    buttons: { gap: 12, paddingBottom: 20 },
+    btnPrimary: { backgroundColor: colors.buttonPrimary, padding: 16, borderRadius: 12, alignItems: 'center' },
+    btnPrimaryText: { color: colors.buttonPrimaryText, fontSize: 16, fontWeight: '600' },
+  })
+}

@@ -3,6 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient'
 import { useEffect, useState } from 'react'
 import { Dimensions, Image, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../hooks/useAuth'
 import { useNight } from '../../lib/NightContext'
 import { supabase } from '../../lib/supabase'
@@ -14,6 +15,8 @@ const GAP = 2
 const TILE_SIZE = (width - GAP * (COLUMNS - 1)) / COLUMNS
 
 export default function CatalogScreen() {
+  const { colors } = useTheme()
+  const styles = createStyles(colors)
   const { activeNight } = useNight()
   const { user } = useAuth()
   const [photos, setPhotos] = useState([])
@@ -143,7 +146,7 @@ export default function CatalogScreen() {
 
   return (
     <LinearGradient
-      colors={['#000005', '#000510', '#001030', '#002060']}
+      colors={colors.backgroundGradient}
       start={{ x: 0, y: 0 }}
       end={{ x: 0, y: 1 }}
       style={{ flex: 1 }}>
@@ -239,38 +242,44 @@ export default function CatalogScreen() {
   )
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16 },
-  title: { fontSize: 20, fontWeight: '700', color: '#fff' },
-  uploadBtn: { borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.3)', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
-  uploadBtnText: { color: '#fff', fontSize: 13 },
-  sortRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, marginBottom: 10 },
-  sortBtn: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 8, backgroundColor: 'transparent' },
-  sortBtnActive: { backgroundColor: 'rgba(255,255,255,0.1)' },
-  sortText: { fontSize: 13, color: 'rgba(255,255,255,0.4)' },
-  sortTextActive: { color: '#fff', fontWeight: '500' },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 0 },
-  tile: { width: TILE_SIZE, height: TILE_SIZE, marginRight: GAP, marginBottom: GAP, position: 'relative' },
-  tileImage: { width: '100%', height: '100%', backgroundColor: 'rgba(255,255,255,0.05)' },
-  tileStats: { position: 'absolute', bottom: 4, right: 4, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 4, paddingHorizontal: 4, paddingVertical: 2 },
-  tileStatsText: { fontSize: 10, color: '#fff' },
-  starBtn: { position: 'absolute', bottom: 4, left: 4, width: 20, height: 20, borderRadius: 10, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' },
-  starIcon: { fontSize: 11, color: 'rgba(255,255,255,0.5)' },
-  starIconActive: { color: '#FFD700' },
-  emptyState: { alignItems: 'center', paddingTop: 60 },
-  emptyText: { fontSize: 15, color: '#fff', marginBottom: 6 },
-  emptySubtext: { fontSize: 12, color: 'rgba(255,255,255,0.4)' },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' },
-  closeBtn: { position: 'absolute', top: 40, right: 20, zIndex: 10 },
-  closeBtnText: { color: '#fff', fontSize: 24 },
-  fullImage: { width: '90%', height: '70%' },
-  commentBox: { position: 'absolute', bottom: 40, right: 20, width: 260, maxHeight: 200, backgroundColor: 'rgba(20,20,30,0.95)', borderRadius: 12, padding: 12 },
-  commentList: { maxHeight: 120, marginBottom: 8 },
-  commentRow: { marginBottom: 6 },
-  commentAuthor: { fontSize: 11, fontWeight: '600', color: '#fff' },
-  commentText: { fontSize: 12, color: 'rgba(255,255,255,0.7)' },
-  commentInputRow: { flexDirection: 'row', alignItems: 'center', gap: 8, borderTopWidth: 0.5, borderTopColor: 'rgba(255,255,255,0.1)', paddingTop: 8 },
-  commentInput: { flex: 1, fontSize: 12, color: '#fff' },
-  commentSend: { fontSize: 12, color: '#4a90e2', fontWeight: '500' },
-})
+function createStyles(colors) {
+  return StyleSheet.create({
+    container: { flex: 1 },
+    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16 },
+    title: { fontSize: 20, fontWeight: '700', color: colors.text },
+    uploadBtn: { borderWidth: 0.5, borderColor: colors.borderStrong, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
+    uploadBtnText: { color: colors.text, fontSize: 13 },
+    sortRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, marginBottom: 10 },
+    sortBtn: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 8, backgroundColor: 'transparent' },
+    sortBtnActive: { backgroundColor: colors.inputBackground },
+    sortText: { fontSize: 13, color: colors.textMuted },
+    sortTextActive: { color: colors.text, fontWeight: '500' },
+    grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 0 },
+    tile: { width: TILE_SIZE, height: TILE_SIZE, marginRight: GAP, marginBottom: GAP, position: 'relative' },
+    tileImage: { width: '100%', height: '100%', backgroundColor: colors.inputBackground },
+    // Overlay badges sit directly on top of photos, need consistent contrast
+    // against arbitrary image content regardless of theme — kept fixed.
+    tileStats: { position: 'absolute', bottom: 4, right: 4, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 4, paddingHorizontal: 4, paddingVertical: 2 },
+    tileStatsText: { fontSize: 10, color: '#fff' },
+    starBtn: { position: 'absolute', bottom: 4, left: 4, width: 20, height: 20, borderRadius: 10, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' },
+    starIcon: { fontSize: 11, color: 'rgba(255,255,255,0.5)' },
+    starIconActive: { color: '#FFD700' },
+    emptyState: { alignItems: 'center', paddingTop: 60 },
+    emptyText: { fontSize: 15, color: colors.text, marginBottom: 6 },
+    emptySubtext: { fontSize: 12, color: colors.textMuted },
+    // Lightbox/comment overlay: intentionally fixed dark regardless of theme,
+    // same reasoning as the other photo-viewer screens.
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' },
+    closeBtn: { position: 'absolute', top: 40, right: 20, zIndex: 10 },
+    closeBtnText: { color: '#fff', fontSize: 24 },
+    fullImage: { width: '90%', height: '70%' },
+    commentBox: { position: 'absolute', bottom: 40, right: 20, width: 260, maxHeight: 200, backgroundColor: 'rgba(20,20,30,0.95)', borderRadius: 12, padding: 12 },
+    commentList: { maxHeight: 120, marginBottom: 8 },
+    commentRow: { marginBottom: 6 },
+    commentAuthor: { fontSize: 11, fontWeight: '600', color: '#fff' },
+    commentText: { fontSize: 12, color: 'rgba(255,255,255,0.7)' },
+    commentInputRow: { flexDirection: 'row', alignItems: 'center', gap: 8, borderTopWidth: 0.5, borderTopColor: 'rgba(255,255,255,0.1)', paddingTop: 8 },
+    commentInput: { flex: 1, fontSize: 12, color: '#fff' },
+    commentSend: { fontSize: 12, color: '#4a90e2', fontWeight: '500' },
+  })
+}

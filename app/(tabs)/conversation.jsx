@@ -1,2 +1,2 @@
-import ConversationScreen from '../../src/screens/messages/ConversationScreen'
+import ConversationScreen from '../../src/screens/messages/ConversationScreen.js'
 export default ConversationScreen
