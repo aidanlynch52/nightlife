@@ -179,6 +179,19 @@ export function useSpotify() {
     setConnected(true)
     await loadSpotifyProfile(tokenResult.accessToken)
   }
+  async function saveTrack(trackId) {
+  if (!accessToken) return { error: 'Not connected to Spotify' }
+  const res = await fetch(`https://api.spotify.com/v1/me/tracks?ids=${trackId}`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${accessToken}` },
+  })
+  if (res.status === 401) {
+    const { data } = await supabase.from('spotify_tokens').select('refresh_token').eq('user_id', user.id).single()
+    if (data) await refreshToken(data.refresh_token)
+    return { error: 'Token refreshed, try again' }
+  }
+  return { error: res.ok ? null : 'Could not save track' }
+}
 
   async function addToQueue(trackUri) {
     if (!accessToken) return { error: 'Not connected to Spotify' }
@@ -218,7 +231,6 @@ export function useSpotify() {
     connectSpotify: () => {
       if (Platform.OS !== 'web') {
         if (!request?.codeVerifier) {
-          // PKCE verifier isn't ready yet — fall back to the tracked flow.
           promptAsync()
           return
         }
@@ -237,6 +249,7 @@ export function useSpotify() {
     },
     addToQueue,
     searchTracks,
+    saveTrack,
     disconnect,
   }
 }
