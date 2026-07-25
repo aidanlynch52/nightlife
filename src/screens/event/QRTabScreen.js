@@ -17,6 +17,7 @@ const QRCode = QRCodeLib?.default ?? QRCodeLib
 
 const MODAL_WIDTH = SCREEN_WIDTH > 600 ? SCREEN_WIDTH * 0.4 : SCREEN_WIDTH * 0.9
 const MODAL_HEIGHT = SCREEN_HEIGHT * 0.7
+const SETTINGS_MODAL_WIDTH = SCREEN_WIDTH > 600 ? 420 : SCREEN_WIDTH * 0.9
 
 function PulsingSpotifyDot({ styles }) {
   const pulseAnim = useRef(new Animated.Value(0)).current
@@ -196,6 +197,179 @@ function ViewRequestsModal({ visible, onClose, eventId, spotifyAddToQueue, onHan
   )
 }
 
+function EventSettingsModal({ visible, onClose, activeNight, onEndEvent, colors, styles }) {
+  const { joinNight } = useNight()
+  const [view, setView] = useState('main') // 'main' | 'transfer'
+  const [autoCloseAt, setAutoCloseAt] = useState(null)
+  const [hoursInput, setHoursInput] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [saveMsg, setSaveMsg] = useState('')
+  const [candidates, setCandidates] = useState([])
+  const [loadingCandidates, setLoadingCandidates] = useState(false)
+  const [transferring, setTransferring] = useState(false)
+  const [hasOtherAttendees, setHasOtherAttendees] = useState(null)
+
+  useEffect(() => {
+    if (visible) {
+      setView('main')
+      setSaveMsg('')
+      loadEvent()
+      checkForOtherAttendees()
+    }
+  }, [visible])
+
+  async function loadEvent() {
+    const { data } = await supabase
+      .from('events')
+      .select('auto_close_at')
+      .eq('id', activeNight.id)
+      .single()
+    setAutoCloseAt(data?.auto_close_at || null)
+  }
+
+  async function checkForOtherAttendees() {
+    const { data } = await supabase
+      .from('event_attendees')
+      .select('user_id')
+      .eq('event_id', activeNight.id)
+      .neq('user_id', activeNight.hostUserId)
+      .limit(1)
+    setHasOtherAttendees((data || []).length > 0)
+  }
+
+  async function saveNewCloseTime() {
+    const hours = parseFloat(hoursInput)
+    if (!hoursInput || isNaN(hours) || hours <= 0) { setSaveMsg('Enter a valid number of hours'); return }
+    setSaving(true)
+    const newCloseDate = new Date()
+    newCloseDate.setMinutes(newCloseDate.getMinutes() + Math.round(hours * 60))
+    const { error } = await supabase
+      .from('events')
+      .update({ auto_close_at: newCloseDate.toISOString() })
+      .eq('id', activeNight.id)
+    setSaving(false)
+    if (error) { setSaveMsg('Could not update, try again'); return }
+    setAutoCloseAt(newCloseDate.toISOString())
+    setHoursInput('')
+    setSaveMsg('Updated!')
+    setTimeout(() => setSaveMsg(''), 2000)
+  }
+
+  async function openTransferPicker() {
+    setView('transfer')
+    setLoadingCandidates(true)
+    const { data } = await supabase
+      .from('event_attendees')
+      .select('user_id, profiles(id, display_name, username, avatar_url)')
+      .eq('event_id', activeNight.id)
+    setCandidates((data || []).filter(a => a.user_id !== activeNight.hostUserId))
+    setLoadingCandidates(false)
+  }
+
+  function confirmTransfer(candidate) {
+    const name = candidate.profiles?.display_name || 'this person'
+    const doTransfer = async () => {
+      setTransferring(true)
+      await supabase.from('events').update({ host_id: candidate.user_id }).eq('id', activeNight.id)
+      setTransferring(false)
+      onClose()
+      joinNight(null)
+      router.replace('/(tabs)/home')
+    }
+    if (Platform.OS === 'web') {
+      if (window.confirm(`Make ${name} the host and leave the event?`)) doTransfer()
+    } else {
+      Alert.alert('Leave event?', `Make ${name} the host and leave the event?`, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Leave', style: 'destructive', onPress: doTransfer },
+      ])
+    }
+  }
+
+  const closeTimeLabel = autoCloseAt
+    ? new Date(autoCloseAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })
+    : 'Not set'
+
+  return (
+    <Modal visible={visible} animationType="fade" transparent>
+      <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={onClose} />
+      <View style={styles.settingsModalCenter}>
+        <View style={styles.settingsModalSheet}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>{view === 'main' ? 'Event settings' : 'Choose new host'}</Text>
+            <TouchableOpacity onPress={view === 'transfer' ? () => setView('main') : onClose}>
+              <Text style={styles.modalClose}>{view === 'transfer' ? '←' : '✕'}</Text>
+            </TouchableOpacity>
+          </View>
+
+          {view === 'main' ? (
+            <>
+              <Text style={styles.settingsLabel}>Currently closes at</Text>
+              <Text style={styles.settingsCloseTime}>{closeTimeLabel}</Text>
+
+              <Text style={[styles.settingsLabel, { marginTop: 16 }]}>Update close time</Text>
+              <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                <TextInput
+                  style={[styles.searchInput, { flex: 1, marginBottom: 0 }]}
+                  placeholder="Hours from now, e.g. 3"
+                  placeholderTextColor={colors.textMuted}
+                  value={hoursInput}
+                  onChangeText={setHoursInput}
+                  keyboardType="decimal-pad"
+                />
+                <TouchableOpacity style={styles.settingsSaveBtn} onPress={saveNewCloseTime} disabled={saving}>
+                  <Text style={styles.settingsSaveBtnText}>{saving ? '...' : 'Save'}</Text>
+                </TouchableOpacity>
+              </View>
+              {saveMsg ? <Text style={styles.settingsSaveMsg}>{saveMsg}</Text> : null}
+
+              <View style={styles.settingsDivider} />
+
+              <TouchableOpacity style={styles.settingsEndBtn} onPress={onEndEvent}>
+                <Text style={styles.settingsEndBtnText}>End Event</Text>
+              </TouchableOpacity>
+
+              {hasOtherAttendees && (
+                <TouchableOpacity style={styles.settingsLeaveBtn} onPress={openTransferPicker}>
+                  <Text style={styles.settingsLeaveBtnText}>Leave Event</Text>
+                </TouchableOpacity>
+              )}
+            </>
+          ) : (
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {loadingCandidates && <Text style={styles.settingsLabel}>Loading...</Text>}
+              {!loadingCandidates && candidates.length === 0 && (
+                <Text style={{ color: colors.textMuted, textAlign: 'center', padding: 20, fontSize: 13 }}>
+                  No one else is currently in this event
+                </Text>
+              )}
+              {candidates.map(c => (
+                <TouchableOpacity
+                  key={c.user_id}
+                  style={styles.attendeeRow}
+                  disabled={transferring}
+                  onPress={() => confirmTransfer(c)}>
+                  <View style={styles.attendeeAvatar}>
+                    {c.profiles?.avatar_url ? (
+                      <Image source={{ uri: c.profiles.avatar_url }} style={styles.attendeeAvatarImg} />
+                    ) : (
+                      <Text style={styles.attendeeAvatarText}>{c.profiles?.display_name?.charAt(0) || '?'}</Text>
+                    )}
+                  </View>
+                  <View style={styles.attendeeInfo}>
+                    <Text style={styles.attendeeName}>{c.profiles?.display_name}</Text>
+                    <Text style={styles.attendeeUsername}>@{c.profiles?.username}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          )}
+        </View>
+      </View>
+    </Modal>
+  )
+}
+
 export default function QRTabScreen() {
   const { colors } = useTheme()
   const styles = createStyles(colors)
@@ -211,6 +385,7 @@ export default function QRTabScreen() {
   const [isAux, setIsAux] = useState(false)
   const [showRequestModal, setShowRequestModal] = useState(false)
   const [showViewRequests, setShowViewRequests] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
   const [pendingCount, setPendingCount] = useState(0)
   const [savedTrackId, setSavedTrackId] = useState(null)
   const isOriginalHost = activeNight?.role === 'host'
@@ -331,6 +506,17 @@ export default function QRTabScreen() {
     setSentRequests(prev => new Set(prev).add(receiverId))
   }
 
+  async function handleMessageHost() {
+    const { data: result } = await supabase.rpc('start_conversation_with_host', {
+      p_event_id: activeNight?.id,
+    })
+    if (!result?.success) return
+    router.push({
+      pathname: '/(tabs)/conversation',
+      params: { conversationId: result.conversation_id },
+    })
+  }
+
   async function handleSaveTrack() {
     if (!nowPlaying) return
     if (!connected) { connectSpotify(); return }
@@ -346,13 +532,17 @@ export default function QRTabScreen() {
 
     if (Platform.OS === 'web') {
       if (window.confirm(`${title}\n${message}`)) {
-        leaveNight().then(() => router.replace('/(tabs)/home'))
+        leaveNight().then(() => {
+          setShowSettings(false)
+          router.replace('/(tabs)/home')
+        })
       }
     } else {
       Alert.alert(title, message, [
         { text: 'Cancel', style: 'cancel' },
         { text: confirmText, style: 'destructive', onPress: async () => {
           await leaveNight()
+          setShowSettings(false)
           router.replace('/(tabs)/home')
         }}
       ])
@@ -382,22 +572,31 @@ export default function QRTabScreen() {
             {isAux && connected && <PulsingSpotifyDot styles={styles} />}
           </View>
 
-          <Text style={styles.title}>{activeNight?.name}</Text>
+          <View style={styles.headerTitleWrap} pointerEvents="none">
+            <Text style={styles.title}>{activeNight?.name}</Text>
+          </View>
 
           <View style={styles.headerRight}>
-            {SCREEN_WIDTH <= 600 && (
-              <TouchableOpacity style={styles.peopleBtn} onPress={() => router.push('/(tabs)/messages')}>
+            {!isHostOrCohost && (
+              <TouchableOpacity style={styles.peopleBtn} onPress={handleMessageHost}>
                 <Text style={styles.peopleBtnText}>💬</Text>
               </TouchableOpacity>
             )}
             <TouchableOpacity style={styles.peopleBtn} onPress={loadAttendees}>
               <Text style={styles.peopleBtnText}>👥</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.endBtn} onPress={handleEndOrLeave}>
-              <Text style={styles.endBtnText}>
-                {activeNight?.role === 'host' || activeNight?.role === 'cohost' ? 'End Event' : 'Leave'}
-              </Text>
-            </TouchableOpacity>
+
+            {isOriginalHost ? (
+              <TouchableOpacity style={styles.peopleBtn} onPress={() => setShowSettings(true)}>
+                <Text style={styles.peopleBtnText}>⚙️</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity style={styles.endBtn} onPress={handleEndOrLeave}>
+                <Text style={styles.endBtnText}>
+                  {activeNight?.role === 'cohost' ? 'End Event' : 'Leave'}
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
 
@@ -513,59 +712,14 @@ export default function QRTabScreen() {
                       </View>
 
                       {a.user_id !== user?.id && (
-                        <View style={{ flexDirection: 'row', gap: 4 }}>
-                          <TouchableOpacity
-                            style={styles.actionBtn}
-                            onPress={async () => {
-                              setShowPeople(false)
-                              const { data: existing } = await supabase
-                                .from('conversation_participants')
-                                .select('conversation_id')
-                                .eq('user_id', user.id)
-
-                              let convId = null
-                              if (existing?.length) {
-                                const convIds = existing.map(e => e.conversation_id)
-                                const { data: theirConvos } = await supabase
-                                  .from('conversation_participants')
-                                  .select('conversation_id')
-                                  .eq('user_id', a.user_id)
-                                  .in('conversation_id', convIds)
-                                if (theirConvos?.length) convId = theirConvos[0].conversation_id
-                              }
-
-                              if (!convId) {
-                                const { data: newConvo } = await supabase.from('conversations').insert({}).select().single()
-                                convId = newConvo.id
-                                await supabase.from('conversation_participants').insert([
-                                  { conversation_id: convId, user_id: user.id },
-                                  { conversation_id: convId, user_id: a.user_id },
-                                ])
-                              }
-
-                              const { router } = await import('expo-router')
-                              router.push({
-                                pathname: '/(tabs)/conversation',
-                                params: {
-                                  conversationId: convId,
-                                  otherUserId: a.user_id,
-                                  otherUserName: profile?.display_name,
-                                  otherUserAvatar: profile?.avatar_url || '',
-                                }
-                              })
-                            }}>
-                            <Text style={styles.actionBtnText}>💬</Text>
-                          </TouchableOpacity>
-
-                          <TouchableOpacity
-                            style={[styles.actionBtn, sentRequests.has(a.user_id) && styles.actionBtnDisabled]}
-                            disabled={sentRequests.has(a.user_id)}
-                            onPress={() => sendFriendRequest(a.user_id)}>
-                            <Text style={styles.actionBtnText}>
-                              {sentRequests.has(a.user_id) ? 'Pending' : 'Add'}
-                            </Text>
-                          </TouchableOpacity>
-                        </View>
+                        <TouchableOpacity
+                          style={[styles.actionBtn, sentRequests.has(a.user_id) && styles.actionBtnDisabled]}
+                          disabled={sentRequests.has(a.user_id)}
+                          onPress={() => sendFriendRequest(a.user_id)}>
+                          <Text style={styles.actionBtnText}>
+                            {sentRequests.has(a.user_id) ? 'Pending' : 'Add'}
+                          </Text>
+                        </TouchableOpacity>
                       )}
 
                       {isOriginalHost && a.user_id !== user?.id && (
@@ -634,6 +788,17 @@ export default function QRTabScreen() {
           onHandled={loadPendingCount}
         />
 
+        {isOriginalHost && (
+          <EventSettingsModal
+            visible={showSettings}
+            onClose={() => setShowSettings(false)}
+            activeNight={{ ...activeNight, hostUserId: user?.id }}
+            onEndEvent={handleEndOrLeave}
+            colors={colors}
+            styles={styles}
+          />
+        )}
+
       </SafeAreaView>
     </LinearGradient>
   )
@@ -648,10 +813,15 @@ function createStyles(colors) {
     spotifyBannerSub: { fontSize: 11, color: colors.textSecondary },
     spotifyBannerArrow: { fontSize: 18, color: '#1aa34a', marginLeft: 8 },
 
-    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 32 },
-    headerLeft: { width: 40, alignItems: 'flex-start', justifyContent: 'center' },
-    title: { flex: 1, fontSize: SCREEN_WIDTH > 600 ? 28 : 0, fontWeight: '700', color: colors.text, textAlign: 'center', height: SCREEN_WIDTH > 600 ? 'auto' : 0 },
-    headerRight: { flexDirection: 'row', alignItems: 'center', gap: 8, justifyContent: 'flex-end' },
+    // Header uses a relative container with the title absolutely centered
+    // over the FULL row width, independent of the left/right button groups
+    // (which differ in width by role) — this is what actually centers it
+    // on screen rather than just within its own flex slot.
+    header: { position: 'relative', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 32, minHeight: 40 },
+    headerLeft: { width: 40, alignItems: 'flex-start', justifyContent: 'center', zIndex: 1 },
+    headerTitleWrap: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
+    title: { fontSize: SCREEN_WIDTH > 600 ? 28 : 0, fontWeight: '700', color: colors.text, textAlign: 'center', height: SCREEN_WIDTH > 600 ? 'auto' : 0 },
+    headerRight: { flexDirection: 'row', alignItems: 'center', gap: 8, justifyContent: 'flex-end', zIndex: 1 },
 
     pulseDotWrap: { width: 16, height: 16, alignItems: 'center', justifyContent: 'center' },
     pulseRing: { position: 'absolute', width: 12, height: 12, borderRadius: 6, backgroundColor: '#1DB954' },
@@ -704,5 +874,18 @@ function createStyles(colors) {
     roleTagHost: { backgroundColor: colors.inputBackground },
     roleTagAux: { backgroundColor: 'rgba(30,215,96,0.12)' },
     roleTagText: { fontSize: 9, fontWeight: '600', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.4 },
+
+    settingsModalCenter: { position: 'absolute', top: '50%', left: '50%', width: SETTINGS_MODAL_WIDTH, transform: [{ translateX: -(SETTINGS_MODAL_WIDTH / 2) }, { translateY: -180 }] },
+    settingsModalSheet: { backgroundColor: colors.cardBackground, borderRadius: 20, padding: 20, maxHeight: 420, borderWidth: 1, borderColor: colors.borderStrong, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 12 },
+    settingsLabel: { fontSize: 12, color: colors.textSecondary, marginBottom: 4 },
+    settingsCloseTime: { fontSize: 16, fontWeight: '600', color: colors.text, marginBottom: 4 },
+    settingsSaveBtn: { backgroundColor: colors.buttonPrimary, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10 },
+    settingsSaveBtnText: { color: colors.buttonPrimaryText, fontSize: 13, fontWeight: '600' },
+    settingsSaveMsg: { fontSize: 11, color: colors.textMuted, marginTop: 6 },
+    settingsDivider: { height: 1, backgroundColor: colors.border, marginVertical: 18 },
+    settingsEndBtn: { borderWidth: 1.5, borderColor: colors.danger, borderRadius: 10, paddingVertical: 12, alignItems: 'center', marginBottom: 10 },
+    settingsEndBtnText: { color: colors.danger, fontSize: 14, fontWeight: '600' },
+    settingsLeaveBtn: { borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
+    settingsLeaveBtnText: { color: colors.text, fontSize: 14, fontWeight: '500' },
   })
 }
