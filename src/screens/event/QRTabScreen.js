@@ -199,7 +199,7 @@ function ViewRequestsModal({ visible, onClose, eventId, spotifyAddToQueue, onHan
 
 function EventSettingsModal({ visible, onClose, activeNight, onEndEvent, colors, styles }) {
   const { joinNight } = useNight()
-  const [view, setView] = useState('main') // 'main' | 'transfer'
+  const [view, setView] = useState('main')
   const [autoCloseAt, setAutoCloseAt] = useState(null)
   const [hoursInput, setHoursInput] = useState('')
   const [saving, setSaving] = useState(false)
@@ -600,9 +600,9 @@ export default function QRTabScreen() {
           </View>
         </View>
 
-        {isHostOrCohost && (
-          <>
-            <View style={styles.qrSection}>
+        <View style={styles.mainContent}>
+          {isHostOrCohost && (
+            <View style={styles.qrGroup}>
               <View style={styles.qrBox}>
                 <QRCode
                   value={`https://nightlifesocialmedia.com/join/${activeNight?.qrToken}`}
@@ -612,20 +612,18 @@ export default function QRTabScreen() {
                 />
               </View>
               <Text style={styles.hint}>Display or share this QR to let people in</Text>
+              <View style={styles.buttons}>
+                <TouchableOpacity style={styles.btnPrimary} onPress={handlePrint}>
+                  <Text style={styles.btnPrimaryText}>Print QR</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.btnPrimary} onPress={handleCopyLink}>
+                  <Text style={styles.btnPrimaryText}>{copied ? 'Copied!' : 'Copy invite link'}</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-            <View style={styles.buttons}>
-              <TouchableOpacity style={styles.btnPrimary} onPress={handlePrint}>
-                <Text style={styles.btnPrimaryText}>Print QR</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.btnPrimary} onPress={handleCopyLink}>
-                <Text style={styles.btnPrimaryText}>{copied ? 'Copied!' : 'Copy invite link'}</Text>
-              </TouchableOpacity>
-            </View>
-          </>
-        )}
+          )}
 
-        {isAux && (
-          <View style={styles.centerContent}>
+          {isAux && (
             <TouchableOpacity style={styles.viewRequestsBtn} onPress={() => setShowViewRequests(true)}>
               <Text style={styles.viewRequestsText}>View Requests</Text>
               {pendingCount > 0 && (
@@ -634,36 +632,36 @@ export default function QRTabScreen() {
                 </View>
               )}
             </TouchableOpacity>
-          </View>
-        )}
+          )}
 
-        {isPlainAttendee && (
-          <View style={styles.centerContent}>
-            {nowPlaying ? (
-              <>
-                {nowPlaying.album_art_url && (
-                  <Image source={{ uri: nowPlaying.album_art_url }} style={styles.nowPlayingArt} />
-                )}
-                <Text style={styles.nowPlayingTrack} numberOfLines={2}>{nowPlaying.track_name}</Text>
-                <Text style={styles.nowPlayingArtist} numberOfLines={1}>{nowPlaying.artist_name}</Text>
-                <TouchableOpacity
-                  style={[styles.btnPrimary, savedTrackId === nowPlaying.spotify_track_id && styles.actionBtnDisabled]}
-                  disabled={savedTrackId === nowPlaying.spotify_track_id}
-                  onPress={handleSaveTrack}>
-                  <Text style={styles.btnPrimaryText}>
-                    {savedTrackId === nowPlaying.spotify_track_id ? 'Added ✓' : connected ? 'Add to my Spotify' : 'Connect Spotify to save'}
-                  </Text>
-                </TouchableOpacity>
-              </>
-            ) : (
-              <Text style={styles.hint}>Nothing's playing right now</Text>
-            )}
+          {isPlainAttendee && (
+            <View style={styles.centerContent}>
+              {nowPlaying ? (
+                <>
+                  {nowPlaying.album_art_url && (
+                    <Image source={{ uri: nowPlaying.album_art_url }} style={styles.nowPlayingArt} />
+                  )}
+                  <Text style={styles.nowPlayingTrack} numberOfLines={2}>{nowPlaying.track_name}</Text>
+                  <Text style={styles.nowPlayingArtist} numberOfLines={1}>{nowPlaying.artist_name}</Text>
+                  <TouchableOpacity
+                    style={[styles.btnPrimary, savedTrackId === nowPlaying.spotify_track_id && styles.actionBtnDisabled]}
+                    disabled={savedTrackId === nowPlaying.spotify_track_id}
+                    onPress={handleSaveTrack}>
+                    <Text style={styles.btnPrimaryText}>
+                      {savedTrackId === nowPlaying.spotify_track_id ? 'Added ✓' : connected ? 'Add to my Spotify' : 'Connect Spotify to save'}
+                    </Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <Text style={styles.hint}>Nothing's playing right now</Text>
+              )}
 
-            <TouchableOpacity style={styles.requestSongBtn} onPress={() => setShowRequestModal(true)}>
-              <Text style={styles.requestSongText}>Request a song</Text>
-            </TouchableOpacity>
-          </View>
-        )}
+              <TouchableOpacity style={styles.requestSongBtn} onPress={() => setShowRequestModal(true)}>
+                <Text style={styles.requestSongText}>Request a song</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
 
         <Modal visible={showPeople} animationType="fade" transparent>
           <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setShowPeople(false)} />
@@ -689,7 +687,14 @@ export default function QRTabScreen() {
                   const profile = a.profiles
                   const roleLabel = a.role === 'host' ? 'Host' : a.role === 'aux' ? 'Aux' : null
                   return (
-                    <View key={a.user_id} style={styles.attendeeRow}>
+                    <TouchableOpacity
+                      key={a.user_id}
+                      style={styles.attendeeRow}
+                      disabled={a.user_id === user?.id}
+                      onPress={() => {
+                        setShowPeople(false)
+                        router.push({ pathname: '/(tabs)/view-profile', params: { userId: a.user_id } })
+                      }}>
                       <View style={styles.attendeeAvatar}>
                         {profile?.avatar_url ? (
                           <Image source={{ uri: profile.avatar_url }} style={styles.attendeeAvatarImg} />
@@ -715,7 +720,7 @@ export default function QRTabScreen() {
                         <TouchableOpacity
                           style={[styles.actionBtn, sentRequests.has(a.user_id) && styles.actionBtnDisabled]}
                           disabled={sentRequests.has(a.user_id)}
-                          onPress={() => sendFriendRequest(a.user_id)}>
+                          onPress={(e) => { e.stopPropagation(); sendFriendRequest(a.user_id) }}>
                           <Text style={styles.actionBtnText}>
                             {sentRequests.has(a.user_id) ? 'Pending' : 'Add'}
                           </Text>
@@ -726,21 +731,24 @@ export default function QRTabScreen() {
                         <View style={styles.attendeeActions}>
                           <TouchableOpacity
                             style={styles.actionBtn}
-                            onPress={async () => {
-                              await supabase.from('event_hosts').insert({ event_id: activeNight.id, user_id: a.user_id })
+                            onPress={(e) => {
+                              e.stopPropagation()
+                              supabase.from('event_hosts').insert({ event_id: activeNight.id, user_id: a.user_id })
                             }}>
                             <Text style={styles.actionBtnText}>Host</Text>
                           </TouchableOpacity>
                           <TouchableOpacity
                             style={styles.actionBtn}
-                            onPress={async () => {
-                              await supabase.from('aux_assignments').insert({ event_id: activeNight.id, user_id: a.user_id })
+                            onPress={(e) => {
+                              e.stopPropagation()
+                              supabase.from('aux_assignments').insert({ event_id: activeNight.id, user_id: a.user_id })
                             }}>
                             <Text style={styles.actionBtnText}>Aux</Text>
                           </TouchableOpacity>
                           <TouchableOpacity
                             style={[styles.actionBtn, styles.actionBtnRed]}
-                            onPress={() => {
+                            onPress={(e) => {
+                              e.stopPropagation()
                               Alert.alert('Remove member?', `Remove ${profile?.display_name} from the night?`, [
                                 { text: 'Cancel', style: 'cancel' },
                                 {
@@ -759,7 +767,7 @@ export default function QRTabScreen() {
                           </TouchableOpacity>
                         </View>
                       )}
-                    </View>
+                    </TouchableOpacity>
                   )
                 })}
                 {filteredAttendees.length === 0 && (
@@ -813,10 +821,6 @@ function createStyles(colors) {
     spotifyBannerSub: { fontSize: 11, color: colors.textSecondary },
     spotifyBannerArrow: { fontSize: 18, color: '#1aa34a', marginLeft: 8 },
 
-    // Header uses a relative container with the title absolutely centered
-    // over the FULL row width, independent of the left/right button groups
-    // (which differ in width by role) — this is what actually centers it
-    // on screen rather than just within its own flex slot.
     header: { position: 'relative', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 32, minHeight: 40 },
     headerLeft: { width: 40, alignItems: 'flex-start', justifyContent: 'center', zIndex: 1 },
     headerTitleWrap: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
@@ -832,14 +836,15 @@ function createStyles(colors) {
     endBtn: { borderWidth: 1.5, borderColor: colors.danger, borderRadius: 8, paddingHorizontal: SCREEN_WIDTH > 600 ? 14 : 8, paddingVertical: SCREEN_WIDTH > 600 ? 7 : 4, backgroundColor: colors.cardBackground, justifyContent: 'center' },
     endBtnText: { color: colors.danger, fontSize: SCREEN_WIDTH > 600 ? 13 : 11, fontWeight: '500' },
 
-    qrSection: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 20 },
+    mainContent: { flex: 1, alignItems: 'center', paddingTop: 60, gap: 40 },
+    qrGroup: { alignItems: 'center', gap: 16 },
     qrBox: { backgroundColor: '#fff', padding: 20, borderRadius: 16, borderWidth: 1, borderColor: '#ddd' },
     hint: { fontSize: 13, color: colors.textMuted, textAlign: 'center' },
-    buttons: { flexDirection: 'row', justifyContent: 'center', gap: 12, paddingBottom: 20 },
+    buttons: { flexDirection: 'row', justifyContent: 'center', gap: 12 },
     btnPrimary: { backgroundColor: colors.cardBackground, borderWidth: 2, borderColor: colors.text, paddingVertical: 10, paddingHorizontal: 24, borderRadius: 20, alignItems: 'center' },
     btnPrimaryText: { color: colors.text, fontSize: 14, fontWeight: '600' },
 
-    centerContent: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, paddingHorizontal: 24 },
+    centerContent: { alignItems: 'center', gap: 16, paddingHorizontal: 24 },
     nowPlayingArt: { width: 200, height: 200, borderRadius: 12, marginBottom: 8 },
     nowPlayingTrack: { fontSize: 20, fontWeight: '700', color: colors.text, textAlign: 'center' },
     nowPlayingArtist: { fontSize: 14, color: colors.textSecondary, textAlign: 'center', marginBottom: 8 },

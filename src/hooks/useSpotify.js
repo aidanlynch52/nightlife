@@ -125,18 +125,24 @@ export function useSpotify() {
     setLoading(false)
   }
 
-  async function loadSpotifyProfile(token) {
-    try {
-      const res = await fetch('https://api.spotify.com/v1/me', {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      const data = await res.json()
-      setSpotifyProfile(data)
-    } catch (e) {
-      console.error('Spotify profile error:', e)
+async function loadSpotifyProfile(token) {
+  if (!token) return
+  try {
+    const res = await fetch('https://api.spotify.com/v1/me', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    if (!res.ok) {
+      console.error('Spotify profile fetch failed:', res.status)
+      return
     }
+    const text = await res.text()
+    if (!text) return
+    const data = JSON.parse(text)
+    setSpotifyProfile(data)
+  } catch (e) {
+    console.error('Spotify profile error:', e)
   }
-
+}
   async function handleAuthResponse(response) {
     try {
       const tokenResult = await exchangeCodeAsync(
@@ -154,19 +160,23 @@ export function useSpotify() {
     }
   }
 
-  async function refreshToken(refreshTokenValue) {
-    try {
-      const tokenResult = await refreshAsync(
-        { clientId: SPOTIFY_CLIENT_ID, refreshToken: refreshTokenValue },
-        discovery
-      )
-      await storeTokens(tokenResult)
-    } catch (e) {
-      console.error('Spotify refresh error:', e)
+async function refreshToken(refreshTokenValue) {
+  try {
+    const tokenResult = await refreshAsync(
+      { clientId: SPOTIFY_CLIENT_ID, refreshToken: refreshTokenValue },
+      discovery
+    )
+    if (!tokenResult?.accessToken) {
+      console.error('Spotify refresh error: no access token returned')
       setConnected(false)
+      return
     }
+    await storeTokens(tokenResult)
+  } catch (e) {
+    console.error('Spotify refresh error:', e)
+    setConnected(false)
   }
-
+}
   async function storeTokens(tokenResult) {
     const expiresAt = new Date(Date.now() + tokenResult.expiresIn * 1000).toISOString()
     await supabase.from('spotify_tokens').upsert({

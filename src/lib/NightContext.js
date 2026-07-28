@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { supabase } from './supabase'
 
 const NightContext = createContext(null)
@@ -6,6 +6,11 @@ const NightContext = createContext(null)
 export function NightProvider({ children }) {
   const [activeNight, setActiveNight] = useState(null)
   const [loading, setLoading] = useState(true)
+  const activeNightRef = useRef(activeNight)
+
+  useEffect(() => {
+    activeNightRef.current = activeNight
+  }, [activeNight])
 
   useEffect(() => {
     async function restoreNight() {
@@ -70,6 +75,34 @@ export function NightProvider({ children }) {
       setLoading(false)
     }
     restoreNight()
+  }, [])
+
+  // Lightweight watchdog: while someone is actively in a night, periodically
+  // confirm it hasn't been auto-closed (by the server-side pg_cron job) or
+  // manually ended by the host. Skips entirely when there's no active night,
+  // so it costs nothing outside a party. The real enforcement lives in
+  // Postgres via pg_cron — this is just so the UI catches up promptly
+  // instead of only on next app launch.
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      const current = activeNightRef.current
+      if (!current?.id) return
+
+      const { data: event } = await supabase
+        .from('events')
+        .select('status, auto_close_at')
+        .eq('id', current.id)
+        .single()
+
+      if (!event) return
+
+      const isExpired = event.auto_close_at && new Date(event.auto_close_at) < new Date()
+      if (event.status === 'closed' || isExpired) {
+        setActiveNight(null)
+      }
+    }, 60000)
+
+    return () => clearInterval(interval)
   }, [])
 
   async function joinNight(night) {

@@ -1,3 +1,4 @@
+import { router } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
 import { Dimensions, FlatList, Image, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -105,7 +106,12 @@ function SearchModal({ visible, onClose, userId }) {
             renderItem={({ item }) => {
               const canAdd = sharedNightIds.has(item.id)
               return (
-                <View style={styles.resultRow}>
+                <TouchableOpacity
+                  style={styles.resultRow}
+                  onPress={() => {
+                    onClose()
+                    router.push({ pathname: '/(tabs)/view-profile', params: { userId: item.id } })
+                  }}>
                   <View style={styles.resultAvatar}>
                     <Image
                       source={{ uri: item.avatar_url || getAvatarUrl(item.id) }}
@@ -120,13 +126,13 @@ function SearchModal({ visible, onClose, userId }) {
                     <TouchableOpacity
                       style={[styles.addBtn, sentRequests.has(item.id) && styles.addBtnDisabled]}
                       disabled={sentRequests.has(item.id)}
-                      onPress={() => sendFriendRequest(item.id)}>
+                      onPress={(e) => { e.stopPropagation(); sendFriendRequest(item.id) }}>
                       <Text style={styles.addBtnText}>
                         {sentRequests.has(item.id) ? 'Pending' : 'Add'}
                       </Text>
                     </TouchableOpacity>
                   )}
-                </View>
+                </TouchableOpacity>
               )
             }}
             ListEmptyComponent={
@@ -149,7 +155,13 @@ function PostCard({ post, styles }) {
   return (
     <View style={styles.postCardWrap}>
       <View style={styles.postCard}>
-        <View style={styles.postHeader}>
+        <TouchableOpacity
+          style={styles.postHeader}
+          onPress={() => {
+            if (post.user_id) {
+              router.push({ pathname: '/(tabs)/view-profile', params: { userId: post.user_id } })
+            }
+          }}>
           <View style={styles.postAvatar}>
             {post.profiles?.avatar_url ? (
               <Image source={{ uri: post.profiles.avatar_url }} style={styles.postAvatarImg} />
@@ -161,7 +173,7 @@ function PostCard({ post, styles }) {
             <Text style={styles.postAuthor}>{post.profiles?.display_name}</Text>
             {post.events?.name && <Text style={styles.postEvent}>{post.events.name}</Text>}
           </View>
-        </View>
+        </TouchableOpacity>
 
         {firstPhoto?.photos?.storage_path && (
           <View style={styles.postImageWrap}>

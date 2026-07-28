@@ -1,5 +1,6 @@
 import * as ImagePicker from 'expo-image-picker'
 import { LinearGradient } from 'expo-linear-gradient'
+import { router } from 'expo-router'
 import { useEffect, useState } from 'react'
 import { Alert, Dimensions, Image, Modal, Platform, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -20,6 +21,51 @@ function getPhotoUrl(path) {
 function getAvatarUrl(userId) {
   const { data } = supabase.storage.from('Avatars').getPublicUrl(`${userId}.jpg`)
   return data.publicUrl
+}
+
+function PeopleListModal({ visible, onClose, title, people, loading, colors }) {
+  const styles = createStyles(colors)
+  return (
+    <Modal visible={visible} animationType="fade" transparent>
+      <View style={styles.modalOverlay}>
+        <View style={[styles.editModalSheet, { maxHeight: '70%' }]}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <Text style={styles.editModalTitle}>{title}</Text>
+            <TouchableOpacity onPress={onClose}>
+              <Text style={{ fontSize: 18, color: colors.textMuted }}>✕</Text>
+            </TouchableOpacity>
+          </View>
+          <ScrollView showsVerticalScrollIndicator={false}>
+            {loading && <Text style={{ color: colors.textMuted, padding: 16 }}>Loading...</Text>}
+            {!loading && people.length === 0 && (
+              <Text style={{ color: colors.textMuted, padding: 16 }}>Nobody here yet</Text>
+            )}
+            {people.map(p => (
+              <TouchableOpacity
+                key={p.id}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}
+                onPress={() => {
+                  onClose()
+                  router.push({ pathname: '/(tabs)/view-profile', params: { userId: p.id } })
+                }}>
+                <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.inputBackground, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border, overflow: 'hidden' }}>
+                  {p.avatar_url ? (
+                    <Image source={{ uri: p.avatar_url }} style={{ width: '100%', height: '100%' }} />
+                  ) : (
+                    <Text style={{ fontSize: 15, fontWeight: '600', color: colors.textSecondary }}>{p.display_name?.charAt(0) || '?'}</Text>
+                  )}
+                </View>
+                <View>
+                  <Text style={{ fontSize: 14, fontWeight: '500', color: colors.text }}>{p.display_name}</Text>
+                  <Text style={{ fontSize: 12, color: colors.textMuted }}>@{p.username}</Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  )
 }
 
 function NightCatalogModal({ night, onClose }) {
@@ -628,16 +674,34 @@ export default function ProfileScreen() {
   const [medals, setMedals] = useState({ gold: null, silver: null, bronze: null })
   const [medalPicker, setMedalPicker] = useState(null)
   const [stats, setStats] = useState({ nights: 0, friends: 0, met: 0 })
+  const [showFriendsModal, setShowFriendsModal] = useState(false)
+  const [showMetModal, setShowMetModal] = useState(false)
+  const [friendsList, setFriendsList] = useState([])
+  const [metList, setMetList] = useState([])
+  const [loadingFriends, setLoadingFriends] = useState(false)
+  const [loadingMet, setLoadingMet] = useState(false)
+  const [privacy, setPrivacy] = useState({ posts_visibility: 'friends', medals_visibility: 'friends', stats_visibility: 'friends' })
   const { user } = useAuth()
 
   useEffect(() => {
     if (!user) return
-    loadProfile(); loadMedals(); loadStats()
+    loadProfile(); loadMedals(); loadStats(); loadPrivacy()
   }, [user])
 
   async function loadProfile() {
     const { data } = await supabase.from('profiles').select('display_name, username, avatar_url').eq('id', user.id).single()
     if (data) { setProfile(data); if (data.avatar_url) setAvatarUri(data.avatar_url) }
+  }
+
+  async function loadPrivacy() {
+    const { data } = await supabase.from('profile_privacy').select('*').eq('user_id', user.id).maybeSingle()
+    if (data) setPrivacy(data)
+  }
+
+  async function updatePrivacy(field, value) {
+    const next = { ...privacy, [field]: value }
+    setPrivacy(next)
+    await supabase.from('profile_privacy').upsert({ user_id: user.id, ...next }, { onConflict: 'user_id' })
   }
 
   async function loadStats() {
@@ -656,6 +720,55 @@ export default function ProfileScreen() {
       metCount = new Set(coAttendees?.map(a => a.user_id) || []).size
     }
     setStats({ nights: nightCount, friends: friendCount || 0, met: metCount })
+  }
+
+  async function loadFriendsList() {
+    setShowFriendsModal(true)
+    setLoadingFriends(true)
+    const { data: connections } = await supabase
+      .from('connections')
+      .select('user_a, user_b')
+      .or(`user_a.eq.${user.id},user_b.eq.${user.id}`)
+
+    const friendIds = (connections || []).map(c => c.user_a === user.id ? c.user_b : c.user_a)
+    if (!friendIds.length) { setFriendsList([]); setLoadingFriends(false); return }
+
+    const { data: profilesData } = await supabase
+      .from('profiles')
+      .select('id, display_name, username, avatar_url')
+      .in('id', friendIds)
+
+    setFriendsList(profilesData || [])
+    setLoadingFriends(false)
+  }
+
+  async function loadMetList() {
+    setShowMetModal(true)
+    setLoadingMet(true)
+    const { data: attendances } = await supabase
+      .from('event_attendees')
+      .select('event_id')
+      .eq('user_id', user.id)
+
+    if (!attendances?.length) { setMetList([]); setLoadingMet(false); return }
+
+    const eventIds = attendances.map(a => a.event_id)
+    const { data: coAttendees } = await supabase
+      .from('event_attendees')
+      .select('user_id')
+      .in('event_id', eventIds)
+      .neq('user_id', user.id)
+
+    const metIds = [...new Set((coAttendees || []).map(a => a.user_id))]
+    if (!metIds.length) { setMetList([]); setLoadingMet(false); return }
+
+    const { data: profilesData } = await supabase
+      .from('profiles')
+      .select('id, display_name, username, avatar_url')
+      .in('id', metIds)
+
+    setMetList(profilesData || [])
+    setLoadingMet(false)
   }
 
   async function loadMedals() {
@@ -761,8 +874,12 @@ export default function ProfileScreen() {
             </View>
             <View style={styles.statsRight}>
               <View style={styles.statItem}><Text style={styles.statNum}>{stats.nights}</Text><Text style={styles.statLabel}>Nights</Text></View>
-              <View style={styles.statItem}><Text style={styles.statNum}>{stats.friends}</Text><Text style={styles.statLabel}>Friends</Text></View>
-              <View style={styles.statItem}><Text style={styles.statNum}>{stats.met}</Text><Text style={styles.statLabel}>Met</Text></View>
+              <TouchableOpacity style={styles.statItem} onPress={loadFriendsList}>
+                <Text style={styles.statNum}>{stats.friends}</Text><Text style={styles.statLabel}>Friends</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.statItem} onPress={loadMetList}>
+                <Text style={styles.statNum}>{stats.met}</Text><Text style={styles.statLabel}>Met</Text>
+              </TouchableOpacity>
             </View>
           </View>
 
@@ -813,6 +930,24 @@ export default function ProfileScreen() {
 
       <NightPickerModal visible={!!medalPicker} onClose={() => setMedalPicker(null)} onSelect={assignMedal} userId={user?.id} />
 
+      <PeopleListModal
+        visible={showFriendsModal}
+        onClose={() => setShowFriendsModal(false)}
+        title="Friends"
+        people={friendsList}
+        loading={loadingFriends}
+        colors={colors}
+      />
+
+      <PeopleListModal
+        visible={showMetModal}
+        onClose={() => setShowMetModal(false)}
+        title="People you've met"
+        people={metList}
+        loading={loadingMet}
+        colors={colors}
+      />
+
       <Modal visible={showEditModal} animationType="fade" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.editModalSheet}>
@@ -839,6 +974,26 @@ export default function ProfileScreen() {
                 thumbColor="#fff"
               />
             </View>
+
+            <Text style={[styles.editLabel, { marginTop: 20 }]}>Privacy — visible to anyone you've met</Text>
+            {[
+              { key: 'posts_visibility', label: 'Posts' },
+              { key: 'medals_visibility', label: 'Medals' },
+              { key: 'stats_visibility', label: 'Statistics' },
+            ].map(row => (
+              <View key={row.key} style={styles.themeRow}>
+                <Text style={styles.editLabel}>{row.label}</Text>
+                <Switch
+                  value={privacy[row.key] === 'met'}
+                  onValueChange={(val) => updatePrivacy(row.key, val ? 'met' : 'friends')}
+                  trackColor={{ false: '#ccc', true: '#1DB954' }}
+                  thumbColor="#fff"
+                />
+              </View>
+            ))}
+            <Text style={{ fontSize: 10, color: colors.textMuted, marginTop: 4 }}>
+              Off = friends only. On = anyone you've met can see.
+            </Text>
 
             <View style={styles.editModalBtns}>
               <TouchableOpacity style={styles.editCancelBtn} onPress={() => setShowEditModal(false)}><Text style={styles.editCancelText}>Cancel</Text></TouchableOpacity>
