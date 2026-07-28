@@ -4,6 +4,7 @@ import { router } from 'expo-router'
 import { useEffect, useState } from 'react'
 import { Alert, Dimensions, Image, Modal, Platform, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import Svg, { Path } from 'react-native-svg'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../hooks/useAuth'
 import { useSpotify } from '../../hooks/useSpotify'
@@ -55,11 +56,113 @@ function PeopleListModal({ visible, onClose, title, people, loading, colors }) {
                     <Text style={{ fontSize: 15, fontWeight: '600', color: colors.textSecondary }}>{p.display_name?.charAt(0) || '?'}</Text>
                   )}
                 </View>
-                <View>
+                <View style={{ flex: 1 }}>
                   <Text style={{ fontSize: 14, fontWeight: '500', color: colors.text }}>{p.display_name}</Text>
                   <Text style={{ fontSize: 12, color: colors.textMuted }}>@{p.username}</Text>
                 </View>
+                <View style={{ flexDirection: 'row', gap: 12 }}>
+                  <View style={{ alignItems: 'center' }}>
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: colors.text }}>{p.stats?.nights ?? 0}</Text>
+                    <Text style={{ fontSize: 8, color: colors.textMuted }}>Nights</Text>
+                  </View>
+                  <View style={{ alignItems: 'center' }}>
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: colors.text }}>{p.stats?.friends ?? 0}</Text>
+                    <Text style={{ fontSize: 8, color: colors.textMuted }}>Friends</Text>
+                  </View>
+                  <View style={{ alignItems: 'center' }}>
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: colors.text }}>{p.stats?.met ?? 0}</Text>
+                    <Text style={{ fontSize: 8, color: colors.textMuted }}>Met</Text>
+                  </View>
+                </View>
               </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  )
+}
+
+function RequestsModal({ visible, onClose, colors, onRespond }) {
+  const styles = createStyles(colors)
+  const [requests, setRequests] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [responding, setResponding] = useState(null)
+
+  useEffect(() => {
+    if (visible) loadRequests()
+  }, [visible])
+
+  async function loadRequests() {
+    setLoading(true)
+    const { data } = await supabase.rpc('get_incoming_friend_requests')
+    setRequests(data || [])
+    setLoading(false)
+  }
+
+  async function respond(requestId, accept) {
+    setResponding(requestId)
+    await supabase.rpc('respond_to_connection_request', { p_request_id: requestId, p_accept: accept })
+    setRequests(prev => prev.filter(r => r.request_id !== requestId))
+    setResponding(null)
+    onRespond?.()
+  }
+
+  function formatMetDate(dateStr) {
+    if (!dateStr) return null
+    return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  }
+
+  return (
+    <Modal visible={visible} animationType="fade" transparent>
+      <View style={styles.modalOverlay}>
+        <View style={[styles.editModalSheet, { maxHeight: '70%' }]}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <Text style={styles.editModalTitle}>Notifications</Text>
+            <TouchableOpacity onPress={onClose}>
+              <Text style={{ fontSize: 18, color: colors.textMuted }}>✕</Text>
+            </TouchableOpacity>
+          </View>
+          <ScrollView showsVerticalScrollIndicator={false}>
+            {loading && <Text style={{ color: colors.textMuted, padding: 16 }}>Loading...</Text>}
+            {!loading && requests.length === 0 && (
+              <Text style={{ color: colors.textMuted, padding: 16 }}>Nothing new</Text>
+            )}
+            {requests.map(r => (
+              <View key={r.request_id} style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.inputBackground, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border, overflow: 'hidden' }}>
+                    {r.avatar_url ? (
+                      <Image source={{ uri: r.avatar_url }} style={{ width: '100%', height: '100%' }} />
+                    ) : (
+                      <Text style={{ fontSize: 15, fontWeight: '600', color: colors.textSecondary }}>{r.display_name?.charAt(0) || '?'}</Text>
+                    )}
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 14, fontWeight: '500', color: colors.text }}>{r.display_name}</Text>
+                    <Text style={{ fontSize: 12, color: colors.textMuted }}>@{r.username}</Text>
+                  </View>
+                </View>
+                <Text style={{ fontSize: 11, color: colors.textMuted, marginTop: 6, marginLeft: 50 }}>
+                  {r.first_met_at
+                    ? `Met ${formatMetDate(r.first_met_at)} · ${r.times_met} night${r.times_met !== 1 ? 's' : ''} together`
+                    : 'No shared nights yet'}
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 8, marginLeft: 50 }}>
+                  <TouchableOpacity
+                    style={{ backgroundColor: colors.buttonPrimary, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 6 }}
+                    disabled={responding === r.request_id}
+                    onPress={() => respond(r.request_id, true)}>
+                    <Text style={{ color: colors.buttonPrimaryText, fontSize: 12, fontWeight: '600' }}>Accept</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 6 }}
+                    disabled={responding === r.request_id}
+                    onPress={() => respond(r.request_id, false)}>
+                    <Text style={{ color: colors.textSecondary, fontSize: 12, fontWeight: '500' }}>Decline</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
             ))}
           </ScrollView>
         </View>
@@ -681,11 +784,18 @@ export default function ProfileScreen() {
   const [loadingFriends, setLoadingFriends] = useState(false)
   const [loadingMet, setLoadingMet] = useState(false)
   const [privacy, setPrivacy] = useState({ posts_visibility: 'friends', medals_visibility: 'friends', stats_visibility: 'friends' })
+  const [showRequestsModal, setShowRequestsModal] = useState(false)
+  // Total notification count shown on the bell badge. Currently only
+  // friend requests contribute, but this is a single aggregation point —
+  // when likes/comments notifications exist, add their counts here
+  // (e.g. requestsCount + likesCount + commentsCount) without touching
+  // the badge UI itself.
+  const [notificationsCount, setNotificationsCount] = useState(0)
   const { user } = useAuth()
 
   useEffect(() => {
     if (!user) return
-    loadProfile(); loadMedals(); loadStats(); loadPrivacy()
+    loadProfile(); loadMedals(); loadStats(); loadPrivacy(); loadNotificationsCount()
   }, [user])
 
   async function loadProfile() {
@@ -702,6 +812,13 @@ export default function ProfileScreen() {
     const next = { ...privacy, [field]: value }
     setPrivacy(next)
     await supabase.from('profile_privacy').upsert({ user_id: user.id, ...next }, { onConflict: 'user_id' })
+  }
+
+  async function loadNotificationsCount() {
+    const { data } = await supabase.rpc('get_incoming_friend_requests')
+    const requestsCount = (data || []).length
+    // Future: const likesCount = ...; const commentsCount = ...;
+    setNotificationsCount(requestsCount)
   }
 
   async function loadStats() {
@@ -738,7 +855,9 @@ export default function ProfileScreen() {
       .select('id, display_name, username, avatar_url')
       .in('id', friendIds)
 
-    setFriendsList(profilesData || [])
+    const { data: statsData } = await supabase.rpc('get_people_stats', { p_user_ids: friendIds })
+
+    setFriendsList((profilesData || []).map(p => ({ ...p, stats: statsData?.[p.id] || { nights: 0, friends: 0, met: 0 } })))
     setLoadingFriends(false)
   }
 
@@ -767,7 +886,9 @@ export default function ProfileScreen() {
       .select('id, display_name, username, avatar_url')
       .in('id', metIds)
 
-    setMetList(profilesData || [])
+    const { data: statsData } = await supabase.rpc('get_people_stats', { p_user_ids: metIds })
+
+    setMetList((profilesData || []).map(p => ({ ...p, stats: statsData?.[p.id] || { nights: 0, friends: 0, met: 0 } })))
     setLoadingMet(false)
   }
 
@@ -873,6 +994,29 @@ export default function ProfileScreen() {
               </View>
             </View>
             <View style={styles.statsRight}>
+<TouchableOpacity style={styles.bellBtn} onPress={() => setShowRequestsModal(true)}>
+  <Svg width={isMobile ? 18 : 22} height={isMobile ? 18 : 22} viewBox="0 0 24 24" fill="none">
+    <Path
+      d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"
+      stroke="#00ff0081"
+      strokeWidth={2.2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <Path
+      d="M13.73 21a2 2 0 01-3.46 0"
+      stroke="#00f7ff85"
+      strokeWidth={2.2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </Svg>
+  {notificationsCount > 0 && (
+    <View style={styles.bellBadge}>
+      <Text style={styles.bellBadgeText}>{notificationsCount}</Text>
+    </View>
+  )}
+</TouchableOpacity>
               <View style={styles.statItem}><Text style={styles.statNum}>{stats.nights}</Text><Text style={styles.statLabel}>Nights</Text></View>
               <TouchableOpacity style={styles.statItem} onPress={loadFriendsList}>
                 <Text style={styles.statNum}>{stats.friends}</Text><Text style={styles.statLabel}>Friends</Text>
@@ -946,6 +1090,13 @@ export default function ProfileScreen() {
         people={metList}
         loading={loadingMet}
         colors={colors}
+      />
+
+      <RequestsModal
+        visible={showRequestsModal}
+        onClose={() => setShowRequestsModal(false)}
+        colors={colors}
+        onRespond={() => { loadNotificationsCount(); loadStats() }}
       />
 
       <Modal visible={showEditModal} animationType="fade" transparent>
@@ -1099,6 +1250,15 @@ function createStyles(colors) {
     statsRight: { flexDirection: 'row', gap: isMobile ? 10 : 16, alignItems: 'center' },
     signOutBtn: { position: 'absolute', right: isMobile ? -70 : -95, top: isMobile ? -12 : -18, borderWidth: 1, borderColor: colors.danger, borderRadius: 6, paddingHorizontal: isMobile ? 6 : 8, paddingVertical: 3 },
     signOutText: { color: colors.danger, fontSize: isMobile ? 9 : 11, fontWeight: '500' },
+
+    // Bell notification button, sits directly left of Nights with a
+    // small gap (handled by statsRight's existing `gap`, same spacing
+    // used between the three stat items).
+    bellBtn: { position: 'relative', marginRight: isMobile ? 2 : 4, alignItems: 'center', justifyContent: 'center' },
+    bellIcon: { fontSize: isMobile ? 16 : 20 },
+    bellBadge: { position: 'absolute', top: -6, right: -8, backgroundColor: colors.danger, borderRadius: 8, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
+    bellBadgeText: { color: '#fff', fontSize: 9, fontWeight: '700' },
+
     medalCircle: { width: isMobile ? 60 : 80, height: isMobile ? 60 : 80, borderRadius: isMobile ? 30 : 40, alignItems: 'center', justifyContent: 'center', borderWidth: 2, overflow: 'hidden' },
     medalWrapper: { alignItems: 'center', gap: 4, width: isMobile ? 70 : 90 },
     medalEmoji: { fontSize: isMobile ? 18 : 24 },
